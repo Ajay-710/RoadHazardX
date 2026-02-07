@@ -4,6 +4,8 @@ import HomeScreen from './components/HomeScreen';
 import ReportScreen from './components/ReportScreen';
 import MapScreen from './components/MapScreen';
 import DashboardScreen from './components/DashboardScreen';
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
+import LoginScreen from './components/LoginScreen';
 
 function App() {
     const [currentScreen, setCurrentScreen] = useState('home');
@@ -59,37 +61,42 @@ function App() {
 
     return (
         <main id="app">
-            <Sidebar
-                isOpen={isSidebarOpen}
-                toggleSidebar={toggleSidebar}
-                navigateTo={navigateTo}
-            />
+            <SignedOut>
+                <LoginScreen />
+            </SignedOut>
+            <SignedIn>
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    toggleSidebar={toggleSidebar}
+                    navigateTo={navigateTo}
+                />
 
-            <HomeScreen
-                isActive={currentScreen === 'home'}
-                toggleSidebar={toggleSidebar}
-                navigateTo={navigateTo}
-            />
+                <HomeScreen
+                    isActive={currentScreen === 'home'}
+                    toggleSidebar={toggleSidebar}
+                    navigateTo={navigateTo}
+                />
 
-            <ReportScreen
-                isActive={currentScreen === 'report'}
-                navigateTo={navigateTo}
-                currentUserLocation={userLocation}
-                onSubmit={submitReport}
-            />
+                <ReportScreen
+                    isActive={currentScreen === 'report'}
+                    navigateTo={navigateTo}
+                    currentUserLocation={userLocation}
+                    onSubmit={submitReport}
+                />
 
-            <MapScreen
-                isActive={currentScreen === 'map'}
-                toggleSidebar={toggleSidebar}
-                currentUserLocation={userLocation}
-                hazards={hazards}
-            />
+                <MapScreen
+                    isActive={currentScreen === 'map'}
+                    toggleSidebar={toggleSidebar}
+                    currentUserLocation={userLocation}
+                    hazards={hazards}
+                />
 
-            <DashboardScreen
-                isActive={currentScreen === 'dashboard'}
-                navigateTo={navigateTo}
-                hazards={hazards}
-            />
+                <DashboardScreen
+                    isActive={currentScreen === 'dashboard'}
+                    navigateTo={navigateTo}
+                    hazards={hazards}
+                />
+            </SignedIn>
         </main>
     );
 }

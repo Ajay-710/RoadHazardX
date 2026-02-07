@@ -1,6 +1,8 @@
-import React from 'react';
+import { useUser, SignOutButton } from "@clerk/clerk-react";
 
 const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
+    const { user } = useUser();
+
     return (
         <>
             <div
@@ -11,12 +13,16 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
                 className={`absolute top-0 left-0 bottom-0 w-[280px] bg-slate-900/95 backdrop-blur-xl border-r border-white/20 z-50 transition-transform duration-300 flex flex-col p-6 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
                 <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/20">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-xl text-white">
-                        U
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-xl text-white overflow-hidden">
+                        {user?.imageUrl ? (
+                            <img src={user.imageUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                            <span>{user?.firstName?.charAt(0) || "U"}</span>
+                        )}
                     </div>
-                    <div className="flex flex-col">
-                        <h4 className="font-bold text-white leading-tight">User</h4>
-                        <p className="text-sm text-gray-400">user@example.com</p>
+                    <div className="flex flex-col overflow-hidden">
+                        <h4 className="font-bold text-white leading-tight truncate">{user?.fullName || "User"}</h4>
+                        <p className="text-sm text-gray-400 truncate">{user?.primaryEmailAddress?.emailAddress || "Sign In"}</p>
                     </div>
                 </div>
                 <ul className="flex-1 space-y-2">
@@ -37,9 +43,11 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
                     </li>
                 </ul>
                 <div className="pt-4 mt-auto border-t border-white/10">
-                    <button className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-all font-semibold">
-                        <span className="material-icons-round">logout</span> Logout
-                    </button>
+                    <SignOutButton signOutOptions={{ sessionId: user?.id }}>
+                        <button className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-all font-semibold text-white">
+                            <span className="material-icons-round">logout</span> Logout
+                        </button>
+                    </SignOutButton>
                 </div>
             </nav>
         </>
