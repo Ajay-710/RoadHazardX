@@ -1,0 +1,285 @@
+// Global state
+let map = null;
+let userMarker = null;
+let currentUserLocation = null; // Store location independent of map
+let hazards = [
+    { type: 'Potholes', lat: 12.972, lng: 77.595 },
+    { type: 'Accident', lat: 12.974, lng: 77.592 }
+]; // Mock data
+let cameraStream = null;
+
+// Start watching location immediately
+watchUserLocation();
+
+function navigateTo(screenId) {
+    // Hide all screens
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(screen => {
+        screen.classList.remove('active');
+        screen.style.display = 'none';
+
+        // Stop camera if leaving report screen
+        if (screen.id === 'report-screen' && screenId !== 'report') {
+            stopCamera();
+        }
+    });
+
+    // Show target screen
+    const target = document.getElementById(screenId + '-screen');
+    if (target) {
+        target.style.display = 'flex';
+        setTimeout(() => {
+            target.classList.add('active');
+        }, 10);
+
+        // Initialize map if navigating to map screen
+        if (screenId === 'map') {
+            setTimeout(initMap, 100); // Slight delay for render
+        }
+    }
+}
+
+function initMap() {
+    if (map) {
+        map.invalidateSize();
+        return;
+    }
+
+    // Default: Bangalore (or dynamic)
+    // If we have a location, start there
+    const startLat = currentUserLocation ? currentUserLocation.lat : 12.9716;
+    const startLng = currentUserLocation ? currentUserLocation.lng : 77.5946;
+
+    map = L.map('map').setView([startLat, startLng], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Initial Hazards
+    hazards.forEach(h => addHazardMarker(h.lat, h.lng, h.type));
+
+    // If we already have location, show it
+    if (currentUserLocation) {
+        updateUserMarker(currentUserLocation.lat, currentUserLocation.lng);
+    }
+}
+
+function watchUserLocation() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                currentUserLocation = { lat: latitude, lng: longitude }; // Update global state
+                updateUserMarker(latitude, longitude);
+            },
+            (error) => {
+                console.error("Location error:", error);
+            },
+            { enableHighAccuracy: true }
+        );
+    }
+}
+
+function updateUserMarker(lat, lng) {
+    // Update "Browsing Location" text regardless of map
+    const locText = document.querySelector('.location-detect span:last-child');
+    if (locText) locText.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+    if (!map) return;
+
+    // Create custom icon
+    const userIcon = L.divIcon({
+        className: 'user-marker-icon',
+        html: '<div style="background-color: #2196F3; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
+
+    if (userMarker) {
+        userMarker.setLatLng([lat, lng]);
+    } else {
+        userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
+        map.setView([lat, lng], 16); // Follow user
+    }
+}
+
+function addHazardMarker(lat, lng, type) {
+    if (!map) return;
+    const marker = L.marker([lat, lng]).addTo(map);
+    marker.on('click', () => {
+        showHazardAlert(type);
+    });
+}
+
+// Camera Functions
+async function initCamera(event) {
+    // Prevent re-triggering if clicking internal elements
+    if (event && event.target.id === 'camera-feed') return;
+    if (event && event.target.closest('.capture-btn-overlay')) return;
+
+    const video = document.getElementById('camera-feed');
+    const placeholder = document.getElementById('camera-placeholder');
+    const preview = document.getElementById('photo-preview');
+    const captureBtn = document.getElementById('capture-btn');
+
+    // If already captured, asking to retake?
+    if (preview.style.display === 'block') {
+        preview.style.display = 'none';
+        video.style.display = 'block';
+    }
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            cameraStream = stream;
+            video.srcObject = stream;
+            video.play();
+
+            placeholder.style.display = 'none';
+            video.style.display = 'block';
+            captureBtn.style.display = 'flex'; // Show button
+
+            // Note: Removed video.onclick to force use of button as requested
+
+        } catch (err) {
+            console.error("Camera Error: ", err);
+            alert("Could not access camera. Please allow permissions.");
+        }
+    }
+}
+
+function capturePhotoEvent(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    capturePhoto();
+}
+
+function capturePhoto() {
+    const video = document.getElementById('camera-feed');
+    const canvas = document.getElementById('photo-canvas');
+    const preview = document.getElementById('photo-preview');
+    const captureBtn = document.getElementById('capture-btn');
+
+    if (!cameraStream) return;
+
+    // Draw video frame to canvas
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    // --- Watermark Location & Date ---
+    let locationText = "Loc: Waiting for GPS...";
+    if (currentUserLocation) {
+        locationText = `Lat: ${currentUserLocation.lat.toFixed(6)}, Lng: ${currentUserLocation.lng.toFixed(6)}`;
+    }
+    const timeText = new Date().toLocaleString();
+
+    // Background strip
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+
+    // Text
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillText("RoadHazeX Hazard Report", 20, canvas.height - 35);
+    ctx.font = "14px sans-serif";
+    ctx.fillText(`${timeText} | ${locationText}`, 20, canvas.height - 15);
+    // ---------------------------------
+
+    // Show preview
+    preview.src = canvas.toDataURL('image/png');
+    preview.style.display = 'block';
+    video.style.display = 'none';
+    captureBtn.style.display = 'none'; // Hide button after capture
+
+    stopCamera();
+}
+
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+}
+
+function submitReport() {
+    const type = document.getElementById('hazard-type').value;
+
+    // Use current user location or fallback
+    let lat = 12.9716, lng = 77.5946;
+
+    if (currentUserLocation) {
+        lat = currentUserLocation.lat;
+        lng = currentUserLocation.lng;
+    } else if (userMarker) {
+        const ll = userMarker.getLatLng();
+        lat = ll.lat;
+        lng = ll.lng;
+    }
+
+    // Add to system
+    hazards.push({ type, lat, lng });
+    addHazardMarker(lat, lng, type);
+
+    alert(`Report Submitted!\nType: ${type}\nLocation: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    navigateTo('map'); // Go to map to see it
+}
+
+function showHazardAlert(text) {
+    const alertBox = document.getElementById('hazard-alert');
+    const alertText = alertBox.querySelector('p');
+    if (text) alertText.textContent = `Drive Safe - ${text} reported`;
+
+    alertBox.classList.remove('hidden');
+    setTimeout(() => {
+        alertBox.classList.add('hidden');
+    }, 4000);
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('menu-overlay');
+    sidebar.classList.toggle('active');
+    overlay.classList.toggle('active');
+}
+
+// Safe Route Navigation
+function getSafeRoute() {
+    const modal = document.getElementById('route-modal');
+    modal.classList.remove('hidden');
+    document.getElementById('destination-input').focus();
+}
+
+function closeRouteModal() {
+    document.getElementById('route-modal').classList.add('hidden');
+}
+
+function startNavigation() {
+    const dest = document.getElementById('destination-input').value;
+    if (!dest) {
+        alert("Please enter a destination");
+        return;
+    }
+
+    closeRouteModal();
+    alert(`Getting safe route to: ${dest}\nAvoiding known hazards...`);
+
+    // Mock Navigation UI
+    if (map && (userMarker || currentUserLocation)) {
+        // Draw a line to a random point just for demo
+        const userLoc = userMarker ? userMarker.getLatLng() : currentUserLocation;
+        const destLoc = [userLoc.lat + 0.005, userLoc.lng + 0.005];
+
+        // Add destination marker
+        L.marker(destLoc).addTo(map).bindPopup(dest).openPopup();
+
+        // Draw polyline
+        L.polyline([userLoc, destLoc], { color: 'blue', weight: 4, dashArray: '10, 10' }).addTo(map);
+
+        showHazardAlert(`Navigating to ${dest}`);
+    }
+}

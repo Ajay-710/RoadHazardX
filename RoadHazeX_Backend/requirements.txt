@@ -1,0 +1,8 @@
+flask
+flask-cors
+torch
+torchvision
+joblib
+scikit-learn
+pillow
+git+https://github.com/openai/CLIP.git
