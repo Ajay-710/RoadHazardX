@@ -166,9 +166,20 @@ function Stat({ value, label }) {
 }
 
 /* ─── Main Login Screen ─── */
-const LoginScreen = () => {
+const LoginScreen = ({ onBack }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-stretch bg-[#0d1b3e] overflow-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            
+            {/* Back to Hero Button */}
+            {onBack && (
+                <button 
+                    onClick={onBack}
+                    className="absolute top-6 left-6 z-[60] p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 transition-all text-white flex items-center justify-center"
+                    title="Back to Homepage"
+                >
+                    <span className="material-icons-round">arrow_back</span>
+                </button>
+            )}
 
             {/* ── LEFT PANEL ── */}
             <div className="relative hidden md:flex flex-col flex-1 overflow-hidden">

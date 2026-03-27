@@ -2,6 +2,7 @@ import React from 'react';
 import { SignOutButton, useUser } from '@clerk/clerk-react';
 
 const NAV_ITEMS = [
+    { id: 'hero', icon: 'auto_awesome', label: 'Overview' },
     { id: 'home', icon: 'home', label: 'Home' },
     { id: 'report', icon: 'report', label: 'Report Hazard' },
     { id: 'map', icon: 'map', label: 'Smart Map' },

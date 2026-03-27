@@ -15,7 +15,8 @@
 
 @layer base {
     body {
-        @apply font-sans text-white h-screen overflow-hidden bg-bg-gradient;
+        @apply font-sans text-white bg-bg-gradient;
+        overflow-x: hidden;
     }
 
     #root {

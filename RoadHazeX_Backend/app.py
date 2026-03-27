@@ -50,10 +50,22 @@ def validate_prediction(ai_pred, user_selected):
     """
     Step 8: Validate AI prediction against user selection.
     """
-    # Normalize comparison (case insensitive/trimmed)
-    if str(ai_pred).strip().lower() != str(user_selected).strip().lower():
-        return False, "⚠️ AI detected mismatch. Please report again."
-    return True, "✅ Verified successfully"
+    ai_norm = str(ai_pred).strip().lower()
+    user_norm = str(user_selected).strip().lower()
+
+    # Basic exact matches
+    if ai_norm == user_norm:
+        return True, "✅ Verified successfully"
+
+    # Plural vs Singular handling (e.g. "pothole" vs "potholes")
+    if (ai_norm + 's' == user_norm) or (user_norm + 's' == ai_norm):
+        return True, "✅ Verified successfully"
+
+    # Substring matching (e.g. "street lights" vs "street light")
+    if (ai_norm in user_norm or user_norm in ai_norm) and len(ai_norm) > 3 and len(user_norm) > 3:
+        return True, "✅ Verified successfully"
+
+    return False, "⚠️ AI detected mismatch. Please report again."
 
 @app.route("/")
 def home():

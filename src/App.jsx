@@ -12,8 +12,10 @@ import { db, storage } from './firebase';
 import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
+import HeroSection from './components/HeroSection';
+
 function App() {
-    const [currentScreen, setCurrentScreen] = useState('home');
+    const [currentScreen, setCurrentScreen] = useState('hero');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [userLocation, setUserLocation] = useState(null);
     const [successData, setSuccessData] = useState(null);
@@ -80,7 +82,7 @@ function App() {
             const storageRef = ref(storage, filename);
             const uploadTask = uploadString(storageRef, imageBase64, 'data_url');
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Firebase Storage Upload Timeout")), 15000)
+                setTimeout(() => reject(new Error("Firebase Storage Upload Timeout")), 45000)
             );
 
             await Promise.race([uploadTask, timeoutPromise]);
@@ -176,40 +178,50 @@ function App() {
             )}
 
             <SignedOut>
-                <LoginScreen />
+                {currentScreen === 'hero' ? (
+                    <HeroSection onGetStarted={() => navigateTo('login')} />
+                ) : (
+                    <LoginScreen onBack={() => navigateTo('hero')} />
+                )}
             </SignedOut>
             <SignedIn>
-                <Sidebar
-                    isOpen={isSidebarOpen}
-                    toggleSidebar={toggleSidebar}
-                    navigateTo={navigateTo}
-                />
+                {currentScreen === 'hero' ? (
+                    <HeroSection onGetStarted={() => navigateTo('home')} />
+                ) : (
+                    <>
+                        <Sidebar
+                            isOpen={isSidebarOpen}
+                            toggleSidebar={toggleSidebar}
+                            navigateTo={navigateTo}
+                        />
 
-                <HomeScreen
-                    isActive={currentScreen === 'home'}
-                    toggleSidebar={toggleSidebar}
-                    navigateTo={navigateTo}
-                />
+                        <HomeScreen
+                            isActive={currentScreen === 'home'}
+                            toggleSidebar={toggleSidebar}
+                            navigateTo={navigateTo}
+                        />
 
-                <ReportScreen
-                    isActive={currentScreen === 'report'}
-                    navigateTo={navigateTo}
-                    currentUserLocation={userLocation}
-                    onSubmit={submitReport}
-                />
+                        <ReportScreen
+                            isActive={currentScreen === 'report'}
+                            navigateTo={navigateTo}
+                            currentUserLocation={userLocation}
+                            onSubmit={submitReport}
+                        />
 
-                <MapScreen
-                    isActive={currentScreen === 'map'}
-                    toggleSidebar={toggleSidebar}
-                    currentUserLocation={userLocation}
-                    hazards={hazards}
-                />
+                        <MapScreen
+                            isActive={currentScreen === 'map'}
+                            toggleSidebar={toggleSidebar}
+                            currentUserLocation={userLocation}
+                            hazards={hazards}
+                        />
 
-                <DashboardScreen
-                    isActive={currentScreen === 'dashboard'}
-                    navigateTo={navigateTo}
-                    hazards={hazards}
-                />
+                        <DashboardScreen
+                            isActive={currentScreen === 'dashboard'}
+                            navigateTo={navigateTo}
+                            hazards={hazards}
+                        />
+                    </>
+                )}
             </SignedIn>
         </main>
     );
