@@ -323,11 +323,12 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
             const blob = await res.blob();
             const formData = new FormData();
             formData.append('image', blob, 'capture.png');
-            formData.append('hazard', hazardType); // Send user's selection for backend validation
+            formData.append('hazard', hazardType); 
 
             const headers = {};
             const hfToken = import.meta.env.VITE_HF_TOKEN;
-            if (hfToken && hfToken !== 'hf_your_token_here') {
+            // Only add token if it starts with 'hf_' AND is not the default placeholder
+            if (hfToken && hfToken.startsWith('hf_') && hfToken !== 'hf_your_token_here') {
                 headers['Authorization'] = `Bearer ${hfToken}`;
             }
 
@@ -335,14 +336,20 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
             const isLocalInsecure = LOCAL_API_URL.startsWith('http://') && !LOCAL_API_URL.includes('https://');
 
             let apiRes;
+            
+            // Try Cloud first if on HTTPS to avoid Mixed Content blocks
             if (isHttps && isLocalInsecure) {
-                // Browsers block HTTPS -> HTTP. Skip local and use cloud.
-                console.info("Hosted HTTPS environment detected. Using Hugging Face cloud AI for security.");
-                apiRes = await fetch(HF_SPACE_URL, {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData
-                });
+                console.info("HTTPS detected, routing through cloud AI...");
+                try {
+                    apiRes = await fetch(HF_SPACE_URL, {
+                        method: 'POST',
+                        headers: headers,
+                        body: formData
+                    });
+                } catch (e) {
+                    console.error("Cloud AI Error:", e);
+                    throw new Error("Unable to reach Cloud AI. Please check internet or Space status.");
+                }
             } else {
                 // Try local first, then fallback
                 try {
@@ -352,7 +359,7 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                         body: formData
                     });
                 } catch (err) {
-                    console.warn("Local AI unreachable, falling back to Hugging Face cloud.", err);
+                    console.warn("Local AI unreachable, trying cloud fallback...", err);
                     apiRes = await fetch(HF_SPACE_URL, {
                         method: 'POST',
                         headers: headers,

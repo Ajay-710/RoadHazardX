@@ -9,7 +9,8 @@ import LoginScreen from './components/LoginScreen';
 import SuccessOverlay from './components/SuccessOverlay';
 
 import { db, storage } from './firebase';
-import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import * as turf from '@turf/turf';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 import HeroSection from './components/HeroSection';
