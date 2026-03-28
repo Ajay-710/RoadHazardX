@@ -2,25 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /hazards/{hazardId} {
-      // Anyone can read hazards to see them on the map
-      allow read: if true;
+      // Anyone can read and create hazards
+      allow read, create: if true;
       
-      // Public users can ONLY create new reports
-      // They cannot edit or delete existing ones
-      allow create: if request.auth != null;
-      
-      // ONLY Administrative users (or those with specific checks) can update/delete
-      // In production, we'd check for a 'role' field in user metadata
-      // For this architecture, we restrict status updates to authenticated sessions
-      allow update, delete: if request.auth != null && 
-                           (request.resource.data.status != resource.data.status ? 
-                           checkIfAdmin() : true);
-    }
-    
-    function checkIfAdmin() {
-      // This is a placeholder for your actual admin check logic
-      // e.g., return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-      return true; // Set to true for initial ease of deployment
+      // Allow updates/deletes publically for now, or specify further
+      allow update, delete: if true;
     }
   }
 }
