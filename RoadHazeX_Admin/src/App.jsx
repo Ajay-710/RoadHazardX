@@ -1,13 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { SignedIn, SignedOut, SignIn, UserButton, useUser } from '@clerk/clerk-react';
 import AdminDashboard from './AdminDashboard';
-import { db } from './firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { signInWithCustomToken } from 'firebase/auth';
+
 
 function App() {
   const [hazards, setHazards] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
   const { user } = useUser();
+
+  // --- Python-Firebase Auth Bridge ---
+  useEffect(() => {
+    const bridgeAuth = async () => {
+      if (user) {
+        try {
+          const clerkToken = await user.getToken();
+          const syncResponse = await fetch("http://localhost:7860/auth/sync", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${clerkToken}` }
+          });
+          const syncData = await syncResponse.json();
+          if (syncData.firebase_token) {
+            await signInWithCustomToken(auth, syncData.firebase_token);
+            console.log("🔐 Admin Bridge Verified via Backend.");
+          }
+        } catch (err) {
+          console.warn("Auth sync failed via Python.", err);
+        }
+      }
+    };
+    bridgeAuth();
+  }, [user]);
+
+
+
+  const AUTHORIZED_EMAIL = 'roadhazex@gmail.com';
 
   // --- Real-time Hazard Listener ---
   useEffect(() => {
@@ -26,17 +57,72 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const AUTHORIZED_EMAIL = 'roadhazex@gmail.com';
+  // --- Role Based System ---
+  useEffect(() => {
+    const syncUserRole = async () => {
+      if (!user) {
+        setUserRole(null);
+        setIsCheckingRole(false);
+        return;
+      }
+
+      const userEmail = user.primaryEmailAddress?.emailAddress;
+      const userDocRef = doc(db, "users", user.id);
+      
+      console.log(`🔍 Checking access for: ${userEmail}`);
+
+      try {
+        const userSnap = await getDoc(userDocRef);
+        
+        if (userSnap.exists()) {
+          const cloudRole = userSnap.data().role;
+          // Force Admin role for official email even if it exists as user
+          if (userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() && cloudRole !== 'admin') {
+            await setDoc(userDocRef, { role: 'admin' }, { merge: true });
+            setUserRole('admin');
+          } else {
+            setUserRole(cloudRole);
+          }
+        } else {
+          // Auto-assign admin role for the specified official account
+          const initialRole = userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() ? 'admin' : 'user';
+          await setDoc(userDocRef, {
+            email: userEmail,
+            role: initialRole,
+            username: user.username || user.fullName || 'Unknown',
+            createdAt: serverTimestamp()
+          });
+          setUserRole(initialRole);
+        }
+      } catch (err) {
+        console.error("Role sync error:", err);
+      } finally {
+        setIsCheckingRole(false);
+      }
+
+    };
+
+    syncUserRole();
+  }, [user]);
+
   const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const isAuthorized = userEmail === AUTHORIZED_EMAIL;
+  const isAuthorized = userRole === 'admin' && userEmail?.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase();
+
+
+
 
   return (
     <div className="w-full h-screen bg-[#020617] overflow-hidden">
       <SignedIn>
-        {isAuthorized ? (
+        {isCheckingRole ? (
+          <div className="w-full h-full flex items-center justify-center bg-[#020617]">
+              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+          </div>
+        ) : isAuthorized ? (
           /* Main Administrative Dashboard */
           <div className="w-full h-full flex flex-col relative animate-fade-in">
-               <AdminDashboard hazards={hazards} />
+               <AdminDashboard hazards={hazards} userRole={userRole} />
+
                
                {/* Floating Clerk Profile Trigger */}
                <div className="absolute top-4 right-4 z-50">
@@ -67,6 +153,7 @@ function App() {
           </div>
         )}
       </SignedIn>
+
 
       <SignedOut>
         <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">

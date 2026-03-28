@@ -10,7 +10,7 @@ import './HeroSection.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const HeroSection = ({ onGetStarted }) => {
+const HeroSection = ({ onGetStarted, onMenuClick }) => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const titleRef = useRef(null);
@@ -564,15 +564,25 @@ const HeroSection = ({ onGetStarted }) => {
     <div ref={containerRef} className="hero-container cosmos-style">
       <canvas ref={canvasRef} className="hero-canvas" />
       
-      {/* Side menu */}
-      <div ref={menuRef} className="side-menu" style={{ visibility: 'hidden' }}>
-        <div className="menu-icon">
+      {/* Side menu - High Z-index with pointer events */}
+      <div 
+        ref={menuRef} 
+        className="side-menu" 
+        style={{ zIndex: 99999, pointerEvents: 'auto', cursor: 'pointer' }}
+        onClick={(e) => {
+           console.log("⚡ Hero Side-Menu DIV Clicked");
+           onMenuClick?.(e);
+        }}
+      >
+        <div className="menu-icon" title="Toggle Navigation">
           <span></span>
           <span></span>
           <span></span>
         </div>
         <div className="vertical-text">ROADHAZEX</div>
       </div>
+
+
 
       {/* Scroll indicator */}
       <div ref={scrollProgressRef} className="scroll-progress" style={{ visibility: 'hidden' }}>

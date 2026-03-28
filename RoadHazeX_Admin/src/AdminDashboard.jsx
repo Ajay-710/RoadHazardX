@@ -27,7 +27,7 @@ const STATUS_THEMES = {
     "Resolved": { color: "#10b981", bg: "bg-emerald-500/10", border: "border-emerald-500/20", text: "text-emerald-400", pill: "bg-emerald-500", glow: "shadow-[0_0_20px_rgba(16,185,129,0.4)]" }
 };
 
-const AdminDashboard = ({ hazards }) => {
+const AdminDashboard = ({ hazards, userRole }) => {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const [selectedHazard, setSelectedHazard] = useState(null);
@@ -159,7 +159,7 @@ const AdminDashboard = ({ hazards }) => {
                      <div className="w-px h-10 bg-white/5"></div>
                      <div className="text-right">
                           <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Authorization</div>
-                          <div className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] font-black text-blue-400 uppercase">SuperUser</div>
+                          <div className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] font-black text-blue-400 uppercase">{userRole || 'Unauthorized'}</div>
                      </div>
                 </div>
             </header>

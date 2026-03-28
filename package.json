@@ -24,6 +24,7 @@
         "@turf/turf": "^7.3.4",
         "@vitejs/plugin-react": "^5.1.2",
         "firebase": "^12.11.0",
+        "flask": "^0.2.10",
         "gsap": "^3.14.2",
         "maplibre-gl": "^5.21.0",
         "react": "^19.2.3",

@@ -4,14 +4,16 @@ import HomeScreen from './components/HomeScreen';
 import ReportScreen from './components/ReportScreen';
 import MapScreen from './components/MapScreen';
 import DashboardScreen from './components/DashboardScreen';
-import { SignedIn, SignedOut } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import LoginScreen from './components/LoginScreen';
 import SuccessOverlay from './components/SuccessOverlay';
 
-import { db, storage } from './firebase';
+import { db, storage, auth } from './firebase';
 import { collection, addDoc, doc, updateDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import * as turf from '@turf/turf';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { signInWithCustomToken } from 'firebase/auth';
+
 
 import HeroSection from './components/HeroSection';
 
@@ -21,6 +23,37 @@ function App() {
     const [userLocation, setUserLocation] = useState(null);
     const [successData, setSuccessData] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
+    const { user } = useUser();
+    const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+
+    // Python-Firebase Auth Bridge
+    useEffect(() => {
+        const bridgeAuth = async () => {
+            if (isSignedIn && clerkUser) {
+                try {
+                    const clerkToken = await clerkUser.getToken();
+                    const BACKEND_URL = "http://localhost:7860"; // or your HF Spaces URL
+
+                    const syncResponse = await fetch(`${BACKEND_URL}/auth/sync`, {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${clerkToken}` }
+                    });
+
+                    const syncData = await syncResponse.json();
+                    if (syncData.firebase_token) {
+                        await signInWithCustomToken(auth, syncData.firebase_token);
+                        console.log("🔐 Bridge established via Python Backend");
+                    }
+                } catch (err) {
+                    console.warn("Python-Firebase Bridge sync missed.", err);
+                }
+            }
+        };
+        bridgeAuth();
+    }, [isSignedIn, clerkUser]);
+
+
+
 
     const [hazards, setHazards] = useState([]);
 
@@ -59,8 +92,10 @@ function App() {
     }, []);
 
     const toggleSidebar = () => {
+        console.log("🖱️ Sidebar Toggle Requested. Current State:", isSidebarOpen);
         setIsSidebarOpen(!isSidebarOpen);
     };
+
 
     const navigateTo = (screenId) => {
         setCurrentScreen(screenId);
@@ -78,7 +113,24 @@ function App() {
         setIsUploading(true);
 
         try {
+            // 0. Ensure Firebase Auth is synced with Clerk before upload (via Python)
+            if (!auth.currentUser && clerkUser) {
+                try {
+                    const clerkToken = await clerkUser.getToken();
+                    const syncResponse = await fetch(`http://localhost:7860/auth/sync`, {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${clerkToken}` }
+                    });
+                    const syncData = await syncResponse.json();
+                    if (syncData.firebase_token) await signInWithCustomToken(auth, syncData.firebase_token);
+                } catch (e) {
+                    console.warn("On-demand auth sync failed:", e);
+                }
+            }
+
+
             // 1. Upload Base64 image to Firebase Storage
+
             const filename = `hazards/${Date.now()}.png`;
             const storageRef = ref(storage, filename);
             const uploadTask = uploadString(storageRef, imageBase64, 'data_url');
@@ -146,8 +198,10 @@ function App() {
                     resolved: false,
                     timestamp: serverTimestamp(),
                     lastReported: serverTimestamp(),
-                    confidence: confidence || 1.0
+                    confidence: confidence || 1.0,
+                    reporter_id: user?.id
                 };
+
                 
                 await addDoc(collection(db, "hazards"), newHazard);
                 setSuccessData({ ...newHazard, image: imageBase64 });
@@ -180,22 +234,29 @@ function App() {
 
             <SignedOut>
                 {currentScreen === 'hero' ? (
-                    <HeroSection onGetStarted={() => navigateTo('login')} />
+                    <HeroSection 
+                        onGetStarted={() => navigateTo('login')} 
+                        onMenuClick={() => navigateTo('login')}
+                    />
+
                 ) : (
                     <LoginScreen onBack={() => navigateTo('hero')} />
                 )}
             </SignedOut>
             <SignedIn>
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    toggleSidebar={toggleSidebar}
+                    navigateTo={navigateTo}
+                />
+
                 {currentScreen === 'hero' ? (
-                    <HeroSection onGetStarted={() => navigateTo('home')} />
+                    <HeroSection 
+                        onGetStarted={() => navigateTo('home')} 
+                        onMenuClick={toggleSidebar}
+                    />
                 ) : (
                     <>
-                        <Sidebar
-                            isOpen={isSidebarOpen}
-                            toggleSidebar={toggleSidebar}
-                            navigateTo={navigateTo}
-                        />
-
                         <HomeScreen
                             isActive={currentScreen === 'home'}
                             toggleSidebar={toggleSidebar}
@@ -209,6 +270,7 @@ function App() {
                             onSubmit={submitReport}
                         />
 
+
                         <MapScreen
                             isActive={currentScreen === 'map'}
                             toggleSidebar={toggleSidebar}
@@ -219,8 +281,9 @@ function App() {
                         <DashboardScreen
                             isActive={currentScreen === 'dashboard'}
                             navigateTo={navigateTo}
-                            hazards={hazards}
+                            hazards={hazards.filter(h => h.reporter_id === user?.id)}
                         />
+
                     </>
                 )}
             </SignedIn>

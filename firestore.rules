@@ -2,11 +2,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /hazards/{hazardId} {
-      // Anyone can read and create hazards
-      allow read, create: if true;
+      // Anyone can read hazards for public map safety
+      allow read: if true;
       
-      // Allow updates/deletes publically for now, or specify further
-      allow update, delete: if true;
+      // Only authenticated users can submit new reports
+      allow create: if request.auth != null;
+      
+      // Only accounts with the 'admin' role in the /users collection can modify data
+      allow update, delete: if request.auth != null && 
+                             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      // Users can manage their own identity records
+      // Admin can verify these roles
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
+

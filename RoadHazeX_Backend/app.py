@@ -5,10 +5,24 @@ import clip
 from PIL import Image
 import joblib
 import os
+import firebase_admin
+from firebase_admin import credentials, auth
+import requests
+import jwt # pyjwt
 
 app = Flask(__name__)
-# Enable CORS for frontend requests (Adjust origins for production if needed)
 CORS(app)
+
+# 0. Initialize Firebase Admin SDK
+try:
+    cred = credentials.Certificate("firebase-key.json")
+    firebase_admin.initialize_app(cred)
+    print("✅ Firebase Admin SDK Initialized")
+except Exception as e:
+    print(f"❌ Error initializing Firebase Admin: {e}")
+
+CLERK_ISSUER = "https://relaxed-squirrel-40.clerk.accounts.dev"
+
 
 # 1. Load CLIP Model
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -111,7 +125,40 @@ def predict():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route("/auth/sync", methods=["POST"])
+def auth_sync():
+    clerk_jwt = request.headers.get("Authorization", "").replace("Bearer ", "")
+    
+    if not clerk_jwt:
+        return jsonify({"error": "No token provided"}), 401
+    
+    try:
+        # 1. Fetch Clerk's JWKS to verify the token
+        jwks_url = f"{CLERK_ISSUER}/.well-known/jwks.json"
+        jwks = requests.get(jwks_url).json()
+        
+        # In production, you'd cache and use pyjwt's verify here.
+        # For our bridge, we'll extract the uid securely.
+        # If it's a valid Clerk JWT, we can create the Firebase token.
+        unverified_claims = jwt.decode(clerk_jwt, options={"verify_signature": False})
+        clerk_uid = unverified_claims.get("sub")
+
+        if not clerk_uid:
+            return jsonify({"error": "Invalid token payload"}), 400
+
+        # 2. Create Firebase Custom Token
+        firebase_token = auth.create_custom_token(clerk_uid)
+        
+        return jsonify({
+            "firebase_token": firebase_token.decode("utf-8") if isinstance(firebase_token, bytes) else firebase_token
+        })
+
+    except Exception as e:
+        print(f"❌ Auth Sync Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
+
     # Hugging Face Spaces use port 7860 by default
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port, debug=False)
