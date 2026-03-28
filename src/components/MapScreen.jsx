@@ -519,7 +519,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
 
     // Phase 37: Re-calculate routes if mode or preference changes while in preview phase (2)
     useEffect(() => {
-        if (navPhase === 2 && selectedSource && selectedDestination) {
+        if ((navPhase === 2 || navPhase === 1) && selectedSource && selectedDestination) {
             calculateRoutes();
         }
     }, [travelMode, routePreference]);
@@ -2065,15 +2065,15 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                     ]).map(s => (
                                         <button 
                                             key={s.id} 
-                                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${mapStyle === s.id ? 'bg-orange-50 text-orange-600' : 'hover:bg-gray-50'}`}
+                                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${mapStyle === s.id ? 'bg-orange-50 text-orange-600' : 'text-slate-700 hover:bg-gray-50'}`}
                                             onClick={() => { setMapStyle(s.id); setShowLayerMenu(false); }}
                                         >
-                                            <span className={`material-icons-round text-xl ${mapStyle === s.id ? 'text-orange-600' : 'text-gray-400'}`}>
+                                            <span className={`material-icons-round text-xl ${mapStyle === s.id ? 'text-orange-600' : 'text-slate-400'}`}>
                                                 {s.icon || (s.name.toLowerCase().includes('dark') ? 'dark_mode' : (s.name.toLowerCase().includes('satellite') ? 'satellite_alt' : 'map'))}
                                             </span>
                                             <div className="flex flex-col">
                                                 <span className="text-[13px] font-bold">{s.name}</span>
-                                                <span className="text-[9px] opacity-50 font-medium">Vector Style</span>
+                                                <span className="text-[9px] opacity-60 font-medium">Vector Style</span>
                                             </div>
                                         </button>
                                     ))}
@@ -2391,13 +2391,13 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                         className={`min-w-[140px] p-3 rounded-2xl border-2 transition-all cursor-pointer ${selectedRouteIndex === idx ? 'bg-white border-blue-500 shadow-lg' : 'bg-white/60 border-transparent text-gray-500'}`}
                                     >
                                         <div className="flex justify-between items-center mb-1">
-                                            <span className="text-[14px] font-bold text-gray-900">{route.duration}</span>
+                                            <span className={`text-[14px] font-bold ${selectedRouteIndex === idx ? 'text-blue-600' : 'text-gray-900'}`}>{route.duration}</span>
                                             {route.isSafest && <span className="bg-green-100 text-green-700 text-[8px] px-1.5 py-0.5 rounded-md font-black">🛡️ SAFEST</span>}
                                             {!route.isSafest && route.isFastest && <span className="bg-blue-100 text-blue-700 text-[8px] px-1.5 py-0.5 rounded-md font-black">⚡ FASTEST</span>}
                                         </div>
-                                        <div className="text-[10px] opacity-70 mb-2">{route.distance}</div>
-                                        <div className="flex items-center gap-1 text-[9px] font-bold">
-                                            <span className="material-icons-round text-[12px] text-orange-500">warning</span>
+                                        <div className={`text-[10px] font-bold mb-2 ${selectedRouteIndex === idx ? 'text-blue-400' : 'text-gray-400'}`}>{route.distance}</div>
+                                        <div className={`flex items-center gap-1 text-[9px] font-bold ${selectedRouteIndex === idx ? 'text-orange-500' : 'text-gray-400'}`}>
+                                            <span className="material-icons-round text-[12px]">warning</span>
                                             {Math.ceil(route.safetyScore)} Hazards
                                         </div>
                                     </div>

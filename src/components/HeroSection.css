@@ -89,17 +89,25 @@
 }
 
 .hero-subtitle {
-  font-size: clamp(0.9rem, 1.8vw, 1.3rem);
-  opacity: 0.9;
-  max-width: 600px;
+  font-size: clamp(1rem, 2vw, 1.4rem);
+  opacity: 1;
+  max-width: 800px;
   margin: 0 auto;
   color: #fff;
+  text-shadow: 
+    0 2px 4px rgba(0,0,0,0.8),
+    0 4px 10px rgba(0,0,0,0.4);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  position: relative;
+  z-index: 20;
 }
 
 .subtitle-line {
   display: block;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
+  overflow: visible;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
 }
 
 .hero-content button {

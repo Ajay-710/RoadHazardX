@@ -10,7 +10,7 @@ import './HeroSection.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const HeroSection = ({ onGetStarted, onMenuClick }) => {
+const HeroSection = ({ onGetStarted, onMenuClick, isSidebarOpen }) => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const titleRef = useRef(null);
@@ -19,12 +19,11 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
   const menuRef = useRef(null);
 
   const smoothCameraPos = useRef({ x: 0, y: 30, z: 100 });
-  const cameraVelocity = useRef({ x: 0, y: 0, z: 0 });
   
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [currentSection, setCurrentSection] = useState(1);
+  const [currentSection, setCurrentSection] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const totalSections = 2;
+  const totalSections = 2; // Intervals for 3 sections (0, 1, 2)
   
   const threeRefs = useRef({
     scene: null,
@@ -34,7 +33,11 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
     stars: [],
     nebula: null,
     mountains: [],
-    animationId: null
+    animationId: null,
+    targetCameraX: 0,
+    targetCameraY: 30,
+    targetCameraZ: 300,
+    locations: []
   });
 
   // Initialize Three.js
@@ -53,8 +56,8 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
         0.1,
         2000
       );
-      refs.camera.position.z = 100;
-      refs.camera.position.y = 20;
+      refs.camera.position.z = 300;
+      refs.camera.position.y = 30;
 
       // Renderer
       refs.renderer = new THREE.WebGLRenderer({
@@ -85,7 +88,9 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
       createNebula();
       createMountains();
       createAtmosphere();
-      getLocation();
+      
+      // Get initial positions for mountains
+      refs.locations = refs.mountains.map(m => m.position.z);
 
       // Start animation
       animate();
@@ -119,7 +124,7 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
           if (colorChoice < 0.7) {
             color.setHSL(0, 0, 0.8 + Math.random() * 0.2);
           } else if (colorChoice < 0.9) {
-            color.setHSL(0.05, 0.8, 0.7); // Warmer for RoadHazeX
+            color.setHSL(0.08, 0.5, 0.8);
           } else {
             color.setHSL(0.6, 0.5, 0.8);
           }
@@ -151,7 +156,6 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
               vColor = color;
               vec3 pos = position;
               
-              // Slow rotation based on depth
               float angle = time * 0.05 * (1.0 - depth * 0.3);
               mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
               pos.xy = rot * pos.xy;
@@ -177,9 +181,9 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
           depthWrite: false
         });
 
-        const stars = new THREE.Points(geometry, material);
-        refs.scene.add(stars);
-        refs.stars.push(stars);
+        const starSet = new THREE.Points(geometry, material);
+        refs.scene.add(starSet);
+        refs.stars.push(starSet);
       }
     };
 
@@ -190,8 +194,8 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
       const material = new THREE.ShaderMaterial({
         uniforms: {
           time: { value: 0 },
-          color1: { value: new THREE.Color(0xff6b6b) }, // Match RoadHazeX color
-          color2: { value: new THREE.Color(0x1e3c72) }, // Match RoadHazeX color
+          color1: { value: new THREE.Color(0xff6b6b) }, // Red highlight
+          color2: { value: new THREE.Color(0x1e3c72) }, // Deep blue
           opacity: { value: 0.3 }
         },
         vertexShader: `
@@ -234,11 +238,10 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
         depthWrite: false
       });
 
-      const nebula = new THREE.Mesh(geometry, material);
-      nebula.position.z = -1050;
-      nebula.rotation.x = 0;
-      refs.scene.add(nebula);
-      refs.nebula = nebula;
+      const nebulaMesh = new THREE.Mesh(geometry, material);
+      nebulaMesh.position.z = -1050;
+      refs.scene.add(nebulaMesh);
+      refs.nebula = nebulaMesh;
     };
 
     const createMountains = () => {
@@ -256,15 +259,15 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
         const segments = 50;
         
         for (let i = 0; i <= segments; i++) {
-          const x = (i / segments - 0.5) * 1000;
+          const x = (i / segments - 0.5) * 2000;
           const y = Math.sin(i * 0.1) * layer.height + 
                    Math.sin(i * 0.05) * layer.height * 0.5 +
                    Math.random() * layer.height * 0.2 - 100;
           points.push(new THREE.Vector2(x, y));
         }
         
-        points.push(new THREE.Vector2(5000, -300));
-        points.push(new THREE.Vector2(-5000, -300));
+        points.push(new THREE.Vector2(5000, -500));
+        points.push(new THREE.Vector2(-5000, -500));
 
         const shape = new THREE.Shape(points);
         const geometry = new THREE.ShapeGeometry(shape);
@@ -277,7 +280,6 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
 
         const mountain = new THREE.Mesh(geometry, material);
         mountain.position.z = layer.distance;
-        mountain.position.y = layer.distance
         mountain.userData = { baseZ: layer.distance, index };
         refs.scene.add(mountain);
         refs.mountains.push(mountain);
@@ -286,34 +288,24 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
 
     const createAtmosphere = () => {
       const { current: refs } = threeRefs;
-      
       const geometry = new THREE.SphereGeometry(600, 32, 32);
       const material = new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 }
-        },
+        uniforms: { time: { value: 0 } },
         vertexShader: `
           varying vec3 vNormal;
-          varying vec3 vPosition;
-          
           void main() {
             vNormal = normalize(normalMatrix * normal);
-            vPosition = position;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
         fragmentShader: `
           varying vec3 vNormal;
-          varying vec3 vPosition;
           uniform float time;
-          
           void main() {
             float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
             vec3 atmosphere = vec3(0.3, 0.6, 1.0) * intensity;
-            
             float pulse = sin(time * 2.0) * 0.1 + 0.9;
             atmosphere *= pulse;
-            
             gl_FragColor = vec4(atmosphere, intensity * 0.25);
           }
         `,
@@ -332,53 +324,39 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
       
       const time = Date.now() * 0.001;
 
-      // Update stars
-      refs.stars.forEach((starField, i) => {
-        if (starField.material.uniforms) {
-          starField.material.uniforms.time.value = time;
-        }
+      refs.stars.forEach(starSet => {
+        if (starSet.material.uniforms) starSet.material.uniforms.time.value = time;
       });
 
-      // Update nebula
       if (refs.nebula && refs.nebula.material.uniforms) {
         refs.nebula.material.uniforms.time.value = time * 0.5;
       }
 
-      // Smooth camera movement with easing
-      if (refs.camera && refs.targetCameraX !== undefined) {
-        const smoothingFactor = 0.05; // Lower = smoother but slower
-        
-        // Calculate smooth position with easing
+      if (refs.camera) {
+        const smoothingFactor = 0.05;
         smoothCameraPos.current.x += (refs.targetCameraX - smoothCameraPos.current.x) * smoothingFactor;
         smoothCameraPos.current.y += (refs.targetCameraY - smoothCameraPos.current.y) * smoothingFactor;
         smoothCameraPos.current.z += (refs.targetCameraZ - smoothCameraPos.current.z) * smoothingFactor;
         
-        // Add subtle floating motion
         const floatX = Math.sin(time * 0.1) * 2;
         const floatY = Math.cos(time * 0.15) * 1;
         
-        // Apply final position
         refs.camera.position.x = smoothCameraPos.current.x + floatX;
         refs.camera.position.y = smoothCameraPos.current.y + floatY;
         refs.camera.position.z = smoothCameraPos.current.z;
         refs.camera.lookAt(0, 10, -600);
       }
 
-      // Parallax mountains with subtle animation
       refs.mountains.forEach((mountain, i) => {
         const parallaxFactor = 1 + i * 0.5;
         mountain.position.x = Math.sin(time * 0.1) * 2 * parallaxFactor;
-        mountain.position.y = 50 + (Math.cos(time * 0.15) * 1 * parallaxFactor);
       });
 
-      if (refs.composer) {
-        refs.composer.render();
-      }
+      if (refs.composer) refs.composer.render();
     };
 
     initThree();
 
-    // Handle resize
     const handleResize = () => {
       const { current: refs } = threeRefs;
       if (refs.camera && refs.renderer && refs.composer) {
@@ -390,107 +368,12 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
     };
 
     window.addEventListener('resize', handleResize);
-
-    // Cleanup
     return () => {
       const { current: refs } = threeRefs;
-      
-      if (refs.animationId) {
-        cancelAnimationFrame(refs.animationId);
-      }
-
+      if (refs.animationId) cancelAnimationFrame(refs.animationId);
       window.removeEventListener('resize', handleResize);
-
-      // Dispose Three.js resources
-      refs.stars.forEach(starField => {
-        starField.geometry.dispose();
-        starField.material.dispose();
-      });
-
-      refs.mountains.forEach(mountain => {
-        mountain.geometry.dispose();
-        mountain.material.dispose();
-      });
-
-      if (refs.nebula) {
-        refs.nebula.geometry.dispose();
-        refs.nebula.material.dispose();
-      }
-
-      if (refs.renderer) {
-        refs.renderer.dispose();
-      }
     };
   }, []);
-
-  const getLocation = () => {
-    const { current: refs } = threeRefs;
-    const locations = [];
-    refs.mountains.forEach( (mountain, i) => {
-      locations[i] = mountain.position.z
-    })
-    refs.locations = locations
-  }
-
-  // GSAP Animations - Run after component is ready
-  useEffect(() => {
-    if (!isReady) return;
-    
-    // Set initial states to prevent flash
-    gsap.set([menuRef.current, titleRef.current, subtitleRef.current, scrollProgressRef.current], {
-      visibility: 'visible'
-    });
-
-    const tl = gsap.timeline();
-
-    // Animate menu
-    if (menuRef.current) {
-      tl.from(menuRef.current, {
-        x: -100,
-        opacity: 0,
-        duration: 1,
-        ease: "power3.out"
-      });
-    }
-
-    // Animate title with split text
-    if (titleRef.current) {
-      const titleChars = titleRef.current.querySelectorAll('.title-char');
-      tl.from(titleChars, {
-        y: 200,
-        opacity: 0,
-        duration: 1.5,
-        stagger: 0.05,
-        ease: "power4.out"
-      }, "-=0.5");
-    }
-
-    // Animate subtitle lines
-    if (subtitleRef.current) {
-      const subtitleLines = subtitleRef.current.querySelectorAll('.subtitle-line');
-      tl.from(subtitleLines, {
-        y: 50,
-        opacity: 0,
-        duration: 1,
-        stagger: 0.2,
-        ease: "power3.out"
-      }, "-=0.8");
-    }
-
-    // Animate scroll indicator
-    if (scrollProgressRef.current) {
-      tl.from(scrollProgressRef.current, {
-        opacity: 0,
-        y: 50,
-        duration: 1,
-        ease: "power2.out"
-      }, "-=0.5");
-    }
-
-    return () => {
-      tl.kill();
-    };
-  }, [isReady]);
 
   // Scroll handling
   useEffect(() => {
@@ -498,59 +381,45 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
       const scrollY = window.scrollY;
       const windowHeight = window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
-      const maxScroll = documentHeight - windowHeight;
+      const maxScroll = Math.max(1, documentHeight - windowHeight);
       const progress = Math.min(scrollY / maxScroll, 1);
       
       setScrollProgress(progress);
-      const newSection = Math.floor(progress * totalSections);
+      const newSection = Math.min(Math.floor(progress * (totalSections + 0.1)), totalSections);
       setCurrentSection(newSection);
 
       const { current: refs } = threeRefs;
-      
-      // Calculate smooth progress through all sections
       const totalProgress = progress * totalSections;
       const sectionProgress = totalProgress % 1;
       
-      // Define camera positions for each section
       const cameraPositions = [
-        { x: 0, y: 30, z: 300 },    // Section 0 - ROADHAZEX
-        { x: 0, y: 40, z: -50 },     // Section 1 - PERSPECTIVE
-        { x: 0, y: 50, z: -700 }       // Section 2 - SAFETY
+        { x: 0, y: 30, z: 300 },    // HORIZON
+        { x: 0, y: 40, z: -50 },     // COSMOS
+        { x: 0, y: 50, z: -700 }      // INFINITY
       ];
       
-      // Get current and next positions
       const currentPos = cameraPositions[newSection] || cameraPositions[0];
       const nextPos = cameraPositions[newSection + 1] || currentPos;
       
-      // Set target positions (actual smoothing happens in animate loop)
       refs.targetCameraX = currentPos.x + (nextPos.x - currentPos.x) * sectionProgress;
       refs.targetCameraY = currentPos.y + (nextPos.y - currentPos.y) * sectionProgress;
       refs.targetCameraZ = currentPos.z + (nextPos.z - currentPos.z) * sectionProgress;
-      
-      // Smooth parallax for mountains
+
       refs.mountains.forEach((mountain, i) => {
         const speed = 1 + i * 0.9;
-        const targetZ = mountain.userData.baseZ + scrollY * speed * 0.5;
-        if(refs.nebula) refs.nebula.position.z = (targetZ + progress * speed * 0.01) - 100
+        const baseZ = refs.locations[i] || -50;
+        const targetZ = baseZ + scrollY * speed * 0.5;
         
-        // Use the same smoothing approach
-        mountain.userData.targetZ = targetZ;
-        if (progress > 0.7) {
-          mountain.position.z = 600000;
-        }
-        if (progress < 0.7) {
-          mountain.position.z = refs.locations[i]
-        }
+        if (progress > 0.7) mountain.position.z = 600000;
+        else mountain.position.z = targetZ;
       });
-      if(refs.nebula && refs.mountains[3]) refs.nebula.position.z = refs.mountains[3].position.z
+      if(refs.nebula && refs.mountains[3]) refs.nebula.position.z = refs.mountains[3].position.z;
     };
 
     window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Set initial position
-    
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [totalSections]);
-
+  }, []);
 
   const splitTitle = (text) => {
     return text.split('').map((char, i) => (
@@ -564,83 +433,72 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
     <div ref={containerRef} className="hero-container cosmos-style">
       <canvas ref={canvasRef} className="hero-canvas" />
       
-      {/* Side menu - High Z-index with pointer events */}
+      {/* Side menu linked to Sidebar */}
       <div 
         ref={menuRef} 
         className="side-menu" 
-        style={{ zIndex: 99999, pointerEvents: 'auto', cursor: 'pointer' }}
-        onClick={(e) => {
-           console.log("⚡ Hero Side-Menu DIV Clicked");
-           onMenuClick?.(e);
+        style={{ 
+            display: isSidebarOpen ? 'none' : 'flex' 
         }}
+        onClick={onMenuClick}
       >
-        <div className="menu-icon" title="Toggle Navigation">
+        <div className="menu-icon">
           <span></span>
           <span></span>
           <span></span>
         </div>
-        <div className="vertical-text">ROADHAZEX</div>
+        <div className="vertical-text">SPACE</div>
       </div>
 
-
+      {/* Main content - Fixed in center */}
+      <div className="hero-content cosmos-content" style={{ opacity: currentSection === 0 ? 1 : 0, transition: 'opacity 0.8s ease-in-out' }}>
+        <h1 className="hero-title">{splitTitle('ROADHAZEX')}</h1>
+        <div className="hero-subtitle cosmos-subtitle">
+          <p className="subtitle-line">Predicting the Path. Preserving the Road.</p>
+          <p className="subtitle-line">Powering the Future of Safe Transit</p>
+          <button 
+            className="mt-12 px-10 py-4 bg-white text-black font-extrabold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-2xl pointer-events-auto cursor-pointer"
+            onClick={onGetStarted}
+            style={{ pointerEvents: 'auto', zIndex: 50 }}
+          >
+            GET STARTED
+          </button>
+        </div>
+      </div>
 
       {/* Scroll indicator */}
-      <div ref={scrollProgressRef} className="scroll-progress" style={{ visibility: 'hidden' }}>
+      <div ref={scrollProgressRef} className="scroll-progress" style={{ display: isSidebarOpen ? 'none' : 'flex' }}>
         <div className="scroll-text">SCROLL</div>
         <div className="progress-track">
-          <div 
-            className="progress-fill" 
-            style={{ width: `${scrollProgress * 100}%` }}
-          />
+          <div className="progress-fill" style={{ width: `${scrollProgress * 100}%` }} />
         </div>
         <div className="section-counter">
           {String(currentSection).padStart(2, '0')} / {String(totalSections).padStart(2, '0')}
         </div>
       </div>
 
-      {/* Main scrolling sections */}
+      {/* Additional sections for scrolling */}
       <div className="scroll-sections">
-       {[...Array(3)].map((_, i) => {
-          const titles = {
-            0: 'ROADHAZEX',
-            1: 'PERSPECTIVE',
-            2: 'SAFETY'
-          };
-          
+       {[...Array(totalSections + 1)].map((_, i) => {
+          if (i === 0) return <section key={i} className="content-section h-screen" />; // Main is already handled
+          const titles = { 1: 'AI-DRIVEN', 2: 'SAFE ROADS' };
           const subtitles = {
-            0: {
-              line1: 'Empowering road safety,',
-              line2: 'through AI-driven detection'
-            },
-            1: {
-              line1: 'Beyond the boundaries of current maps,',
-              line2: 'lies a smart vision of road integrity'
-            },
-            2: {
-              line1: 'Connecting data with municipal response,',
-              line2: 'creating a safer path for everyone'
-            }
+            1: { line1: 'Real-time Infrastructure Monitoring.', line2: 'Identifying Municipal Risks with AI Precision' },
+            2: { line1: 'Bridging the Gap Between Risk and Response.', line2: 'Engineering a World Without Road Hazards' }
           };
           
           return (
-            <section key={i} className="content-section" style={{ opacity: i === currentSection ? 1 : 0, pointerEvents: i === currentSection ? 'auto' : 'none', transition: 'opacity 0.8s ease-in-out' }}>
+            <section key={i} className="content-section" style={{ opacity: i === currentSection ? 1 : 0, transition: 'opacity 0.8s ease-in-out' }}>
               <div className="section-inner px-6">
-                <h1 className="hero-title">
-                  {splitTitle(titles[i] || 'DEFAULT')}
-                </h1>
-            
+                <h1 className="hero-title">{splitTitle(titles[i])}</h1>
                 <div className="hero-subtitle cosmos-subtitle">
-                  <p className="subtitle-line">
-                    {subtitles[i].line1}
-                  </p>
-                  <p className="subtitle-line">
-                    {subtitles[i].line2}
-                  </p>
+                  <p className="subtitle-line">{subtitles[i].line1}</p>
+                  <p className="subtitle-line">{subtitles[i].line2}</p>
                   <button 
-                      className="mt-12 px-10 py-4 bg-white text-black font-bold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-xl"
-                      onClick={onGetStarted}
+                    className="mt-12 px-10 py-4 bg-white text-black font-extrabold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-2xl pointer-events-auto cursor-pointer"
+                    onClick={onGetStarted}
                   >
-                      {i === 0 ? 'Get Started' : 'Enter Platform'}
+                    ENTER HUB
                   </button>
                 </div>
               </div>

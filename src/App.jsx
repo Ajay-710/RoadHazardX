@@ -4,15 +4,13 @@ import HomeScreen from './components/HomeScreen';
 import ReportScreen from './components/ReportScreen';
 import MapScreen from './components/MapScreen';
 import DashboardScreen from './components/DashboardScreen';
-import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import LoginScreen from './components/LoginScreen';
 import SuccessOverlay from './components/SuccessOverlay';
 
 import { db, storage, auth } from './firebase';
-import { collection, addDoc, doc, updateDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import * as turf from '@turf/turf';
+import { onAuthStateChanged } from 'firebase/auth'; 
+import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { signInWithCustomToken } from 'firebase/auth';
 
 
 import HeroSection from './components/HeroSection';
@@ -20,274 +18,162 @@ import HeroSection from './components/HeroSection';
 function App() {
     const [currentScreen, setCurrentScreen] = useState('hero');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [userLocation, setUserLocation] = useState(null);
     const [successData, setSuccessData] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
-    const { user } = useUser();
-    const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+    
+    const [user, setUser] = useState(null);
+    const [isAuthLoaded, setIsAuthLoaded] = useState(false);
 
-    // Python-Firebase Auth Bridge
     useEffect(() => {
-        const bridgeAuth = async () => {
-            if (isSignedIn && clerkUser) {
-                try {
-                    const clerkToken = await clerkUser.getToken();
-                    const BACKEND_URL = "http://localhost:7860"; // or your HF Spaces URL
-
-                    const syncResponse = await fetch(`${BACKEND_URL}/auth/sync`, {
-                        method: "POST",
-                        headers: { "Authorization": `Bearer ${clerkToken}` }
-                    });
-
-                    const syncData = await syncResponse.json();
-                    if (syncData.firebase_token) {
-                        await signInWithCustomToken(auth, syncData.firebase_token);
-                        console.log("🔐 Bridge established via Python Backend");
-                    }
-                } catch (err) {
-                    console.warn("Python-Firebase Bridge sync missed.", err);
-                }
+        const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+            setUser(authUser);
+            setIsAuthLoaded(true);
+            
+            // Auto-navigate from hero to home if user logs in while on hero
+            if (authUser && currentScreen === 'hero') {
+                // We stay on hero but with auth, 
+                // or we can auto-jump to home if they already logged in before.
+                // However, user said "show animation first", so we keep 'hero' as default.
             }
-        };
-        bridgeAuth();
-    }, [isSignedIn, clerkUser]);
-
-
-
+        });
+        return () => unsubscribe();
+    }, [currentScreen]);
 
     const [hazards, setHazards] = useState([]);
 
     useEffect(() => {
-        // Fetch hazards from Firestore in real-time
-        const q = query(collection(db, "hazards"), orderBy("timestamp", "desc"));
+        const q = query(collection(db, 'hazards'), orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const hazardList = [];
-            snapshot.forEach((doc) => {
-                hazardList.push({ id: doc.id, ...doc.data() });
-            });
-            setHazards(hazardList);
-        }, (error) => {
-            console.error("Firebase fetch error:", error);
+            const data = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setHazards(data);
         });
-
         return () => unsubscribe();
     }, []);
 
-    useEffect(() => {
-        // Watch location
-        if ("geolocation" in navigator) {
-            const watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    setUserLocation({ lat: latitude, lng: longitude });
-                },
-                (error) => {
-                    console.error("Location error:", error);
-                },
-                { enableHighAccuracy: true }
-            );
+    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
-            return () => navigator.geolocation.clearWatch(watchId);
-        }
-    }, []);
-
-    const toggleSidebar = () => {
-        console.log("🖱️ Sidebar Toggle Requested. Current State:", isSidebarOpen);
-        setIsSidebarOpen(!isSidebarOpen);
+    const navigateTo = (screen) => {
+        setCurrentScreen(screen);
+        setIsSidebarOpen(false);
     };
 
-
-    const navigateTo = (screenId) => {
-        setCurrentScreen(screenId);
-        setIsSidebarOpen(false); // Close sidebar on nav
-    };
-
-    const submitReport = async (type, imageBase64, confidence = 1.0, verificationStatus = 'Pending', address = 'Unknown Location') => {
-        let lat = 12.9716, lng = 77.5946; // Default
-
-        if (userLocation) {
-            lat = userLocation.lat;
-            lng = userLocation.lng;
+    const submitReport = async (hazardData) => {
+        if (!user) {
+            setCurrentScreen('login');
+            return;
         }
 
         setIsUploading(true);
-
         try {
-            // 0. Ensure Firebase Auth is synced with Clerk before upload (via Python)
-            if (!auth.currentUser && clerkUser) {
-                try {
-                    const clerkToken = await clerkUser.getToken();
-                    const syncResponse = await fetch(`http://localhost:7860/auth/sync`, {
-                        method: "POST",
-                        headers: { "Authorization": `Bearer ${clerkToken}` }
-                    });
-                    const syncData = await syncResponse.json();
-                    if (syncData.firebase_token) await signInWithCustomToken(auth, syncData.firebase_token);
-                } catch (e) {
-                    console.warn("On-demand auth sync failed:", e);
-                }
+            let imageUrl = '';
+            if (hazardData.image) {
+                const storagePath = `hazards/${Date.now()}.png`;
+                const storageRef = ref(storage, storagePath);
+                await uploadString(storageRef, hazardData.image, 'data_url');
+                imageUrl = await getDownloadURL(storageRef);
             }
 
+            const docData = {
+                type: hazardData.type,
+                lat: hazardData.lat,
+                lng: hazardData.lng,
+                image: imageUrl,
+                confidence: hazardData.confidence || 0.85,
+                timestamp: serverTimestamp(),
+                userId: user.uid,
+                reporterName: user.displayName || 'Anonymous',
+                resolved: false
+            };
 
-            // 1. Upload Base64 image to Firebase Storage
-
-            const filename = `hazards/${Date.now()}.png`;
-            const storageRef = ref(storage, filename);
-            const uploadTask = uploadString(storageRef, imageBase64, 'data_url');
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Firebase Storage Upload Timeout")), 45000)
-            );
-
-            await Promise.race([uploadTask, timeoutPromise]);
-            const imageUrl = await getDownloadURL(storageRef);
-
-            // 2. Snap to Road Precision
-            const OLA_MAPS_API_KEY = "ZTQwHjxak23hMQ4ewtLTUzwMX9l6lJta0bL2uYv6";
-            let snappedLoc = { lat, lng };
-            try {
-                const snapRes = await fetch(`https://api.olamaps.io/routing/v1/snapToRoad?points=${lat},${lng}&api_key=${OLA_MAPS_API_KEY}`);
-                const snapData = await snapRes.json();
-                if (snapData.snapped_points?.[0]) {
-                    snappedLoc = snapData.snapped_points[0].location;
-                }
-            } catch (err) {
-                console.warn("SnapToRoad failed:", err);
-            }
-
-            // 3. Duplicate Detection Logic (50m radius)
-            let duplicateDoc = null;
-            const now = new Date();
-            
-            // Search existing hazards of the same type
-            hazards.forEach(h => {
-                if (h.type === type && !h.resolved) {
-                    const from = turf.point([snappedLoc.lng, snappedLoc.lat]);
-                    const to = turf.point([h.lng, h.lat]);
-                    const distance = turf.distance(from, to, { units: 'kilometers' });
-                    
-                    if (distance <= 0.05) { // 50 meters
-                        duplicateDoc = h;
-                    }
-                }
-            });
-
-            if (duplicateDoc && duplicateDoc.id) {
-                // Update existing hazard
-                const docRef = doc(db, "hazards", duplicateDoc.id);
-                const updatedHazard = {
-                    reportCount: (duplicateDoc.reportCount || 1) + 1,
-                    lastReported: serverTimestamp(),
-                    verification_status: verificationStatus,
-                    // If current status is resolved but new report comes in, reactivate it? 
-                    // Usually we don't merge into resolved ones (filtered above)
-                };
-                await updateDoc(docRef, updatedHazard);
-                console.log("🔄 Duplicate detected. Incremented report count for:", duplicateDoc.id);
-                setSuccessData({ ...duplicateDoc, ...updatedHazard, image: imageBase64 });
-            } else {
-                // Create new hazard
-                const newHazard = {
-                    type,
-                    lat: snappedLoc.lat,
-                    lng: snappedLoc.lng,
-                    address: address, // From reverse geocoding
-                    image: imageUrl,
-                    reportCount: 1,
-                    status: 'Pending', // Initial municipal status
-                    verification_status: verificationStatus,
-                    resolved: false,
-                    timestamp: serverTimestamp(),
-                    lastReported: serverTimestamp(),
-                    confidence: confidence || 1.0,
-                    reporter_id: user?.id
-                };
-
-                
-                await addDoc(collection(db, "hazards"), newHazard);
-                setSuccessData({ ...newHazard, image: imageBase64 });
-            }
+            await addDoc(collection(db, 'hazards'), docData);
+            setSuccessData(docData);
+            setCurrentScreen('home');
         } catch (error) {
             console.error("Firebase submit error:", error);
-            alert(`Error: ${error.message}`);
+            alert("Error reporting hazard: " + error.message);
         } finally {
             setIsUploading(false);
         }
     };
 
-    const handleSuccessDone = () => {
-        setSuccessData(null);
-        navigateTo('map');
+    if (!isAuthLoaded) {
+        return (
+            <div className="fixed inset-0 bg-[#0d1b3e] flex items-center justify-center">
+                 <div className="w-12 h-12 border-4 border-white/10 border-t-blue-500 rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    // Determine the active display
+    const renderContent = () => {
+        // 1. If we are on 'hero', always show hero (public)
+        if (currentScreen === 'hero') {
+            return (
+                <HeroSection 
+                    onGetStarted={() => {
+                        if (user) navigateTo('home');
+                        else navigateTo('login');
+                    }} 
+                    onMenuClick={toggleSidebar}
+                    isSidebarOpen={isSidebarOpen}
+                />
+            );
+        }
+
+        // 2. If user is NOT logged in and tries to access something else, show login
+        if (!user || currentScreen === 'login') {
+            return <LoginScreen onBack={() => navigateTo('hero')} />;
+        }
+
+        // 3. User is logged in, show requested screen
+        return (
+            <>
+                <Sidebar 
+                    isOpen={isSidebarOpen} 
+                    toggleSidebar={toggleSidebar} 
+                    navigateTo={navigateTo} 
+                />
+
+                <main className="relative w-full h-full transition-transform duration-300">
+                    <HomeScreen
+                        isActive={currentScreen === 'home'}
+                        navigateTo={navigateTo}
+                        hazards={hazards}
+                    />
+                    <ReportScreen
+                        isActive={currentScreen === 'report'}
+                        submitReport={submitReport}
+                        isUploading={isUploading}
+                    />
+                    <MapScreen
+                        isActive={currentScreen === 'map'}
+                        hazards={hazards}
+                        toggleSidebar={toggleSidebar}
+                    />
+                    <DashboardScreen
+                        isActive={currentScreen === 'dashboard'}
+                        hazards={hazards}
+                        navigateTo={navigateTo}
+                    />
+                </main>
+
+                {successData && (
+                    <SuccessOverlay 
+                        data={successData} 
+                        onClose={() => setSuccessData(null)} 
+                    />
+                )}
+            </>
+        );
     };
 
     return (
-        <main id="app">
-            <SuccessOverlay visible={!!successData} hazardData={successData} onDone={handleSuccessDone} />
-            
-            {/* Global Uploading Overlay */}
-            {isUploading && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: '60px', height: '60px', border: '5px solid rgba(255,255,255,0.1)', borderTopColor: '#4ade80', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                    <span style={{ color: 'white', marginTop: '1.5rem', fontWeight: 600, fontSize: '1.1rem', letterSpacing: '0.05em' }}>Syncing Hazard to Cloud...</span>
-                    <span style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem', fontSize: '0.85rem' }}>Uploading Image & GeoData</span>
-                </div>
-            )}
-
-            <SignedOut>
-                {currentScreen === 'hero' ? (
-                    <HeroSection 
-                        onGetStarted={() => navigateTo('login')} 
-                        onMenuClick={() => navigateTo('login')}
-                    />
-
-                ) : (
-                    <LoginScreen onBack={() => navigateTo('hero')} />
-                )}
-            </SignedOut>
-            <SignedIn>
-                <Sidebar
-                    isOpen={isSidebarOpen}
-                    toggleSidebar={toggleSidebar}
-                    navigateTo={navigateTo}
-                />
-
-                {currentScreen === 'hero' ? (
-                    <HeroSection 
-                        onGetStarted={() => navigateTo('home')} 
-                        onMenuClick={toggleSidebar}
-                    />
-                ) : (
-                    <>
-                        <HomeScreen
-                            isActive={currentScreen === 'home'}
-                            toggleSidebar={toggleSidebar}
-                            navigateTo={navigateTo}
-                        />
-
-                        <ReportScreen
-                            isActive={currentScreen === 'report'}
-                            navigateTo={navigateTo}
-                            currentUserLocation={userLocation}
-                            onSubmit={submitReport}
-                        />
-
-
-                        <MapScreen
-                            isActive={currentScreen === 'map'}
-                            toggleSidebar={toggleSidebar}
-                            currentUserLocation={userLocation}
-                            hazards={hazards}
-                        />
-
-                        <DashboardScreen
-                            isActive={currentScreen === 'dashboard'}
-                            navigateTo={navigateTo}
-                            hazards={hazards.filter(h => h.reporter_id === user?.id)}
-                        />
-
-                    </>
-                )}
-            </SignedIn>
-        </main>
+        <div className={`relative w-full ${currentScreen === 'hero' ? 'min-h-screen' : 'h-screen overflow-hidden'} bg-bg-gradient shadow-2xl`}>
+            {renderContent()}
+        </div>
     );
 }
 

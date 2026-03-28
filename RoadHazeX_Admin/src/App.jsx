@@ -1,230 +1,209 @@
 import React, { useState, useEffect } from 'react';
-import { SignedIn, SignedOut, SignIn, UserButton, useUser } from '@clerk/clerk-react';
-import AdminDashboard from './AdminDashboard';
-import { db, auth } from './firebase';
+import { auth, db } from './firebase';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { signInWithCustomToken } from 'firebase/auth';
-
+import AdminDashboard from './AdminDashboard';
 
 function App() {
   const [hazards, setHazards] = useState([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [userRole, setUserRole] = useState(null);
   const [isCheckingRole, setIsCheckingRole] = useState(true);
-  const { user } = useUser();
-
-  // --- Python-Firebase Auth Bridge ---
-  useEffect(() => {
-    const bridgeAuth = async () => {
-      if (user) {
-        try {
-          const clerkToken = await user.getToken();
-          const syncResponse = await fetch("http://localhost:7860/auth/sync", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${clerkToken}` }
-          });
-          const syncData = await syncResponse.json();
-          if (syncData.firebase_token) {
-            await signInWithCustomToken(auth, syncData.firebase_token);
-            console.log("🔐 Admin Bridge Verified via Backend.");
-          }
-        } catch (err) {
-          console.warn("Auth sync failed via Python.", err);
-        }
-      }
-    };
-    bridgeAuth();
-  }, [user]);
-
-
+  const [user, setUser] = useState(null);
+  const [isAuthLoaded, setIsAuthLoaded] = useState(false);
 
   const AUTHORIZED_EMAIL = 'roadhazex@gmail.com';
 
-  // --- Real-time Hazard Listener ---
+  // --- Auth & Role Sync ---
   useEffect(() => {
-    const q = query(collection(db, "hazards"), orderBy("timestamp", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const hazardList = [];
-      snapshot.forEach((doc) => {
-        hazardList.push({ id: doc.id, ...doc.data() });
-      });
-      setHazards(hazardList);
-      setIsLoaded(true);
-    }, (error) => {
-      console.error("Firebase fetch error:", error);
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      setUser(authUser);
+      setIsAuthLoaded(true);
+
+      if (authUser) {
+        setIsCheckingRole(true);
+        const userEmail = authUser.email;
+        const userDocRef = doc(db, "users", authUser.uid);
+        
+        console.log(`🔍 Checking Admin Access for: ${userEmail}`);
+
+        try {
+          const userSnap = await getDoc(userDocRef);
+          
+          if (userSnap.exists()) {
+            const cloudRole = userSnap.data().role;
+            // Force Admin role for official email
+            if (userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() && cloudRole !== 'admin') {
+              await setDoc(userDocRef, { role: 'admin' }, { merge: true });
+              setUserRole('admin');
+            } else {
+              setUserRole(cloudRole);
+            }
+          } else {
+            // Auto-assign admin role for official account
+            const initialRole = userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() ? 'admin' : 'user';
+            await setDoc(userDocRef, {
+              email: userEmail,
+              role: initialRole,
+              displayName: authUser.displayName || 'Unknown Official',
+              createdAt: serverTimestamp()
+            });
+            setUserRole(initialRole);
+          }
+        } catch (err) {
+          console.error("Role sync error:", err);
+        } finally {
+          setIsCheckingRole(false);
+        }
+      } else {
+        setUserRole(null);
+        setIsCheckingRole(false);
+      }
     });
 
     return () => unsubscribe();
   }, []);
 
-  // --- Role Based System ---
+  // --- Real-time Hazard Listener ---
   useEffect(() => {
-    const syncUserRole = async () => {
-      if (!user) {
-        setUserRole(null);
-        setIsCheckingRole(false);
-        return;
-      }
-
-      const userEmail = user.primaryEmailAddress?.emailAddress;
-      const userDocRef = doc(db, "users", user.id);
-      
-      console.log(`🔍 Checking access for: ${userEmail}`);
-
-      try {
-        const userSnap = await getDoc(userDocRef);
-        
-        if (userSnap.exists()) {
-          const cloudRole = userSnap.data().role;
-          // Force Admin role for official email even if it exists as user
-          if (userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() && cloudRole !== 'admin') {
-            await setDoc(userDocRef, { role: 'admin' }, { merge: true });
-            setUserRole('admin');
-          } else {
-            setUserRole(cloudRole);
-          }
-        } else {
-          // Auto-assign admin role for the specified official account
-          const initialRole = userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() ? 'admin' : 'user';
-          await setDoc(userDocRef, {
-            email: userEmail,
-            role: initialRole,
-            username: user.username || user.fullName || 'Unknown',
-            createdAt: serverTimestamp()
+    if (user && userRole === 'admin') {
+        const q = query(collection(db, "hazards"), orderBy("timestamp", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const hazardList = [];
+          snapshot.forEach((doc) => {
+            hazardList.push({ id: doc.id, ...doc.data() });
           });
-          setUserRole(initialRole);
-        }
+          setHazards(hazardList);
+          setIsDataLoaded(true);
+        }, (error) => {
+          console.error("Firebase fetch error:", error);
+        });
+        return () => unsubscribe();
+    }
+  }, [user, userRole]);
+
+  const handleLogin = async () => {
+      const provider = new GoogleAuthProvider();
+      try {
+          await signInWithPopup(auth, provider);
       } catch (err) {
-        console.error("Role sync error:", err);
-      } finally {
-        setIsCheckingRole(false);
+          console.error("Login Error:", err);
+          alert("Login failed: " + err.message);
       }
+  };
 
-    };
+  const handleSignOut = () => signOut(auth);
 
-    syncUserRole();
-  }, [user]);
+  if (!isAuthLoaded) {
+    return (
+        <div className="w-full h-screen bg-[#020617] flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+        </div>
+    );
+  }
 
-  const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const isAuthorized = userRole === 'admin' && userEmail?.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase();
-
-
-
-
-  return (
-    <div className="w-full h-screen bg-[#020617] overflow-hidden">
-      <SignedIn>
-        {isCheckingRole ? (
-          <div className="w-full h-full flex items-center justify-center bg-[#020617]">
-              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-          </div>
-        ) : isAuthorized ? (
-          /* Main Administrative Dashboard */
-          <div className="w-full h-full flex flex-col relative animate-fade-in">
-               <AdminDashboard hazards={hazards} userRole={userRole} />
-
-               
-               {/* Floating Clerk Profile Trigger */}
-               <div className="absolute top-4 right-4 z-50">
-                   <div className="bg-slate-900/80 backdrop-blur-md p-1 rounded-full border border-white/10 shadow-2xl flex items-center gap-2 pl-3 pr-1">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none pr-1">Authorized Official</span>
-                       <UserButton afterSignOutUrl="/" />
-                   </div>
-               </div>
-          </div>
-        ) : (
-          /* Access Restricted View */
-          <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">
-               <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-3xl p-10 rounded-[40px] border border-white/10 shadow-2xl relative z-10 text-center space-y-6">
-                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
-                        <span className="material-icons-round text-red-500 text-4xl">gpp_maybe</span>
-                    </div>
-                    <h2 className="text-3xl font-black text-white leading-tight">Access <br/> Restricted</h2>
-                    <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                        The account <strong>{userEmail}</strong> is not authorized to access this municipal node. 
-                        Please sign in with the official department credentials.
-                    </p>
-                    <div className="pt-4">
-                        <UserButton afterSignOutUrl="/" showName />
-                    </div>
-               </div>
-               {/* Decorative background for error */}
-               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 rounded-full blur-[120px] -z-10"></div>
-          </div>
-        )}
-      </SignedIn>
-
-
-      <SignedOut>
-        <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">
-             {/* Decorative Elements */}
+  // --- Main Render Logic ---
+  if (!user) {
+    /* Sign In View */
+    return (
+        <div className="w-full h-screen bg-[#020617] overflow-hidden flex flex-col items-center justify-center p-6 relative">
              <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]"></div>
              <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[140px]"></div>
 
-             <div className="w-full max-w-[1200px] flex flex-col md:flex-row items-center gap-16 relative z-10">
-                 {/* Left Side: Branding */}
-                 <div className="flex-1 text-center md:text-left space-y-8 max-w-xl">
+             <div className="relative z-10 w-full max-w-[1240px] flex flex-col md:flex-row items-center gap-20">
+                 <div className="flex-1 text-center md:text-left space-y-8">
                       <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-4">
                           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                          <span className="text-[11px] font-black text-blue-400 uppercase tracking-[0.2em]">Secure Node 0x7F</span>
+                          <span className="text-[11px] font-black text-blue-400 uppercase tracking-[0.2em]">Restricted Node 0x7F</span>
                       </div>
-                      <h1 className="text-6xl md:text-7xl font-black text-white leading-none tracking-tight">
-                         Municipal <br/>
-                         <span className="text-linear-to-r from-blue-400 to-cyan-400">Command Center</span>
+                      <h1 className="text-6xl md:text-8xl font-black text-white leading-[0.9] tracking-tighter">
+                         COMMAND<br/>
+                         <span className="text-linear-to-r from-blue-400 to-cyan-400">CENTER</span>
                       </h1>
-                      <p className="text-lg text-slate-400 font-medium leading-relaxed max-w-md mx-auto md:mx-0">
-                         Authorized personnel only. Access the real-time road safety infrastructure and hazard resolution engine.
+                      <p className="text-xl text-slate-500 font-medium max-w-md leading-relaxed">
+                         Access the RoadHazardX municipal infrastructure. Resolve incidents and monitor regional telemetry.
                       </p>
-                      
-                      <div className="pt-8 flex flex-col md:flex-row gap-8 items-center md:items-start opacity-60">
-                           <div className="flex items-center gap-3">
-                                <span className="material-icons-round text-blue-500 text-3xl">verified_user</span>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">Real-Time <br/> Verification</div>
-                           </div>
-                           <div className="flex items-center gap-3">
-                                <span className="material-icons-round text-cyan-400 text-3xl">terminal</span>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">Incident <br/> Management</div>
-                           </div>
-                      </div>
                  </div>
 
-                 {/* Right Side: Clerk SignIn */}
-                 <div className="w-full max-w-md shrink-0">
-                      <div className="p-1 rounded-[44px] bg-linear-to-br from-white/10 to-white/0 shadow-2xl relative">
-                           <div className="absolute -inset-4 bg-blue-500/10 blur-3xl -z-10 rounded-full"></div>
-                           <div className="bg-slate-900/60 backdrop-blur-2xl rounded-[40px] p-2 border border-white/5">
-                                <SignIn 
-                                    appearance={{
-                                        elements: {
-                                            rootBox: "w-full",
-                                            card: "bg-transparent shadow-none border-none p-4",
-                                            headerTitle: "text-white text-xl font-black uppercase tracking-tight text-center",
-                                            headerSubtitle: "text-slate-400 text-xs font-bold uppercase tracking-widest text-center",
-                                            socialButtonsBlockButton: "bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all rounded-2xl",
-                                            socialButtonsBlockButtonText: "text-white font-bold",
-                                            dividerLine: "bg-white/5",
-                                            dividerText: "text-slate-500 text-[10px] font-black uppercase",
-                                            formFieldLabel: "text-slate-400 text-[10px] font-black uppercase tracking-widest ml-1 mb-2",
-                                            formFieldInput: "bg-white/5 border border-white/10 text-white rounded-2xl py-3 focus:ring-blue-500/30",
-                                            formButtonPrimary: "bg-linear-to-r from-blue-600 to-blue-500 hover:scale-[1.02] transform transition-all rounded-2xl py-4 font-black uppercase tracking-widest shadow-xl shadow-blue-900/40",
-                                            footerActionText: "text-slate-500",
-                                            footerActionLink: "text-blue-400 font-bold hover:text-blue-300",
-                                            identityPreviewText: "text-white",
-                                            identityPreviewEditButtonIcon: "text-blue-400"
-                                        }
-                                    }}
-                                />
-                           </div>
+                 <div className="w-full max-w-md bg-slate-950/60 backdrop-blur-3xl p-12 rounded-[52px] border border-white/5 shadow-3xl text-center space-y-10 group">
+                      <div className="w-24 h-24 rounded-[40px] bg-slate-900 border border-white/10 flex items-center justify-center mx-auto shadow-2xl group-hover:border-blue-500/30 transition-all">
+                          <span className="material-icons-round text-blue-500 text-5xl group-hover:scale-110 transition-transform">terminal</span>
                       </div>
+                      <div>
+                          <h2 className="text-3xl font-black text-white mb-2">Identify Official</h2>
+                          <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Administrative Verification Requested</p>
+                      </div>
+                      <button 
+                        onClick={handleLogin}
+                        className="w-full flex items-center justify-center gap-4 bg-white/5 hover:bg-white/10 px-8 py-5 rounded-3xl border border-white/5 hover:border-white/20 transition-all active:scale-95 shadow-2xl"
+                      >
+                         <svg className="w-6 h-6" viewBox="0 0 48 48">
+                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                         </svg>
+                         <span className="text-white font-black text-sm tracking-wide">Continue as Official</span>
+                      </button>
+                      <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest leading-none">Automatic Biometric & Keycloak Handshake</p>
                  </div>
-             </div>
-
-             {/* Footer Info */}
-             <div className="absolute bottom-10 left-0 right-0 text-center opacity-30 pointer-events-none">
-                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em]">RoadHazeX Administrative Terminal // v3.2.0</div>
              </div>
         </div>
-      </SignedOut>
+    );
+  }
+
+  if (isCheckingRole) {
+    return (
+        <div className="w-full h-screen bg-[#020617] flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+        </div>
+    );
+  }
+
+  const isAuthorized = userRole === 'admin' && user.email?.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase();
+
+  return (
+    <div className="w-full h-screen bg-[#020617] overflow-hidden">
+        {isAuthorized ? (
+          <div className="w-full h-full flex flex-col relative animate-fade-in">
+               <AdminDashboard hazards={hazards} userRole={userRole} />
+               {/* Fixed Sign Out Control */}
+               <div className="fixed top-6 right-8 z-[100] group flex items-center gap-3 bg-slate-900/40 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/5 shadow-3xl">
+                   <div className="flex flex-col items-end mr-3">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Official Account</span>
+                       <span className="text-xs font-bold text-white mt-1">{user.displayName}</span>
+                   </div>
+                   {user.photoURL && <img src={user.photoURL} alt="avatar" className="w-10 h-10 rounded-xl border border-blue-500/30 shadow-lg" />}
+                   <button 
+                        onClick={handleSignOut}
+                        className="w-10 h-10 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 flex items-center justify-center transition-all border border-orange-500/20"
+                        title="Disconnect Console"
+                   >
+                        <span className="material-icons-round text-xl">power_settings_new</span>
+                   </button>
+               </div>
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">
+               <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-3xl p-10 rounded-[40px] border border-red-500/20 shadow-2xl relative z-10 text-center space-y-6">
+                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+                        <span className="material-icons-round text-red-500 text-4xl">gpp_maybe</span>
+                    </div>
+                    <h2 className="text-3xl font-black text-white leading-tight uppercase tracking-tighter">Access <br/> Denied</h2>
+                    <p className="text-slate-400 text-sm font-medium leading-relaxed">
+                        The account <strong>{user.email}</strong> is not recognized as a Municipal Admin. 
+                        Please disconnect and identify with official credentials.
+                    </p>
+                    <button 
+                        onClick={handleSignOut}
+                        className="w-full py-4 rounded-3xl bg-red-500 text-white font-black uppercase tracking-widest text-sm shadow-xl shadow-red-900/40 transform active:scale-95 transition-all"
+                    >
+                        Disconnect User
+                    </button>
+               </div>
+               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 rounded-full blur-[120px] -z-10"></div>
+          </div>
+        )}
     </div>
   );
 }

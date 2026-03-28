@@ -1,5 +1,6 @@
 import React from 'react';
-import { SignOutButton, useUser } from '@clerk/clerk-react';
+import { auth } from '../firebase';
+import { signOut } from 'firebase/auth';
 
 const NAV_ITEMS = [
     { id: 'hero', icon: 'auto_awesome', label: 'Overview' },
@@ -11,7 +12,16 @@ const NAV_ITEMS = [
 ];
 
 const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
-    const { user, isLoaded } = useUser();
+    const user = auth.currentUser;
+
+    const handleSignOut = async () => {
+        try {
+            await signOut(auth);
+            console.log("🔥 Signed out from Firebase");
+        } catch (error) {
+            console.error("Sign out error:", error);
+        }
+    };
 
     return (
         <>
@@ -57,16 +67,16 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
                 </div>
 
                 {/* User info */}
-                {isLoaded && user && (
+                {user && (
                     <div
                         className="mx-4 mb-4 p-3 rounded-xl flex items-center gap-3 flex-shrink-0"
                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                     >
-                        {user.imageUrl ? (
+                        {user.photoURL ? (
                             <img
-                                src={user.imageUrl}
+                                src={user.photoURL}
                                 alt="avatar"
-                                className="w-10 h-10 rounded-full object-cover border-2 flex-shrink-0"
+                                className="w-10 h-10 rounded-full object-cover border-2 flex-shrink-0 shadow-xl"
                                 style={{ borderColor: 'rgba(255,107,107,0.5)' }}
                             />
                         ) : (
@@ -79,10 +89,10 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
                         )}
                         <div className="min-w-0">
                             <p className="text-sm font-semibold text-white truncate">
-                                {user.fullName || user.firstName || 'User'}
+                                {user.displayName || 'Anonymous User'}
                             </p>
-                            <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                                {user.primaryEmailAddress?.emailAddress || ''}
+                            <p className="text-xs truncate text-white/40">
+                                {user.email || 'Cloud Node Active'}
                             </p>
                         </div>
                     </div>
@@ -92,66 +102,38 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
                 <div className="mx-4 mb-3 h-px flex-shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
 
                 {/* Nav items */}
-                <nav className="flex-1 overflow-y-auto px-3 space-y-1">
+                <nav className="flex-1 overflow-y-auto px-3 space-y-1 custom-scrollbar">
                     {NAV_ITEMS.map(({ id, icon, label }) => (
                         <button
                             key={id}
                             onClick={() => {
                                 if (id === 'admin') {
-                                    // Secure redirection to the separate municipal command center
-                                    const adminUrl = window.location.hostname === 'localhost' 
-                                        ? 'http://localhost:5174' 
-                                        : 'https://roadhazex-admin.web.app';
-                                    window.open(adminUrl, '_blank');
+                                    window.open('https://roadhazex-admin.web.app', '_blank');
                                 } else {
                                     navigateTo(id);
-                                    toggleSidebar();
                                 }
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm transition-all duration-200"
-                            style={{ color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.background = 'rgba(255,107,107,0.12)';
-                                e.currentTarget.style.color = '#fff';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = 'rgba(255,255,255,0.65)';
+                            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all group"
+                            style={{
+                                background: 'transparent',
+                                color: 'rgba(255,255,255,0.6)',
                             }}
                         >
-                            <span className="material-icons-round text-xl" style={{ color: '#FF6B6B' }}>{icon}</span>
-                            {label}
+                            <span className="material-icons-round text-xl transition-colors group-hover:text-white">{icon}</span>
+                            <span className="text-sm font-medium transition-colors group-hover:text-white">{label}</span>
                         </button>
                     ))}
                 </nav>
 
-                {/* Divider */}
-                <div className="mx-4 mt-3 mb-3 h-px flex-shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
-
-                {/* Sign Out */}
-                <div className="px-3 pb-6 flex-shrink-0">
-                    <SignOutButton>
-                        <button
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-200"
-                            style={{
-                                fontWeight: 500,
-                                color: 'rgba(255,107,107,0.85)',
-                                background: 'rgba(255,107,107,0.08)',
-                                border: '1px solid rgba(255,107,107,0.18)',
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.background = 'rgba(255,107,107,0.2)';
-                                e.currentTarget.style.color = '#FF6B6B';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.background = 'rgba(255,107,107,0.08)';
-                                e.currentTarget.style.color = 'rgba(255,107,107,0.85)';
-                            }}
-                        >
-                            <span className="material-icons-round text-xl">logout</span>
-                            Sign Out
-                        </button>
-                    </SignOutButton>
+                {/* Sign out */}
+                <div className="p-4 flex-shrink-0 border-t border-white/5">
+                    <button 
+                        onClick={handleSignOut}
+                        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-bold text-sm transition-all border border-orange-500/20"
+                    >
+                        <span className="material-icons-round text-lg">logout</span>
+                        Sign Out
+                    </button>
                 </div>
             </aside>
         </>

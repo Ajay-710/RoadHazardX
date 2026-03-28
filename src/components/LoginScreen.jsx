@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { SignIn } from '@clerk/clerk-react';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../firebase';
 
 /* ─── Animated canvas: road & particle effect ─── */
 function RoadCanvas() {
@@ -155,18 +156,19 @@ function Badge({ icon, label }) {
     );
 }
 
-/* ─── Stat Card ─── */
-function Stat({ value, label }) {
-    return (
-        <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold" style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{value}</span>
-            <span className="text-xs text-white/50 mt-0.5">{label}</span>
-        </div>
-    );
-}
-
 /* ─── Main Login Screen ─── */
 const LoginScreen = ({ onBack }) => {
+    const handleGoogleLogin = async () => {
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+            console.log("🔥 Firebase Google Login Successful");
+        } catch (err) {
+            console.error("Firebase Login Error:", err);
+            alert("Login failed: " + err.message);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-stretch bg-[#0d1b3e] overflow-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
             
@@ -197,28 +199,25 @@ const LoginScreen = ({ onBack }) => {
                 <div className="relative z-10 flex flex-col flex-1 justify-center px-10 pb-16">
                     <div className="mb-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full w-fit" style={{ background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)' }}>
                         <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#FF6B6B' }}></span>
-                        <span className="text-xs font-semibold text-[#FF6B6B] uppercase tracking-widest">Live Hazard Tracking</span>
+                        <span className="text-xs font-semibold text-[#FF6B6B] uppercase tracking-widest">Live Telemetry Node</span>
                     </div>
 
-                    <h2 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
-                        Report Roads.<br />
+                    <h2 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tighter">
+                        IDENTIFY YOUR<br />
                         <span style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                            Save Lives.
+                            MUNICIPAL RANK.
                         </span>
                     </h2>
-                    <p className="text-white/50 text-base max-w-sm leading-relaxed mb-8">
-                        Join thousands of drivers reporting real-time road hazards — potholes, accidents, waterlogging, and debris — to keep everyone safe.
+                    <p className="text-white/40 text-base max-w-sm leading-relaxed mb-10 font-medium">
+                        Securely connect to the RoadHazardX network to manage road integrity, report hazards, and monitor AI-driven detections.
                     </p>
 
                     {/* Badges */}
                     <div className="flex flex-wrap gap-2 mb-10">
-                        <Badge icon="map" label="Smart Navigation" />
-                        <Badge icon="camera_alt" label="AI Detection" />
-                        <Badge icon="people" label="Community Driven" />
-                        <Badge icon="notifications_active" label="Real-time Alerts" />
+                        <Badge icon="map" label="Smart Maps" />
+                        <Badge icon="analytics" label="AI Insight" />
+                        <Badge icon="security" label="Encrypted" />
                     </div>
-
-
                 </div>
 
                 {/* Bottom fade */}
@@ -229,168 +228,55 @@ const LoginScreen = ({ onBack }) => {
             <div className="flex flex-col items-center justify-center w-full md:w-[420px] lg:w-[460px] relative px-6 py-10"
                 style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
 
-                {/* Ambient glow blob */}
-                <div className="absolute top-[-80px] right-[-80px] w-64 h-64 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,107,107,0.15) 0%, transparent 70%)' }} />
-                <div className="absolute bottom-[-60px] left-[-60px] w-48 h-48 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,142,83,0.12) 0%, transparent 70%)' }} />
-
-                {/* Mobile logo (shown only on small screens) */}
-                <div className="flex md:hidden items-center gap-3 mb-8">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)' }}>
-                        <span className="material-icons-round text-white text-xl">warning</span>
-                    </div>
-                    <span className="text-xl font-bold text-white tracking-wide">RoadHazardX</span>
-                </div>
-
+                <div className="absolute top-[-80px] right-[-80px] w-64 h-64 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,107,107,0.1) 0%, transparent 70%)' }} />
+                
                 {/* Heading */}
-                <div className="text-center mb-6 relative z-10 w-full">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)' }}>
-                        <span className="material-icons-round text-white text-3xl">shield</span>
+                <div className="text-center mb-10 relative z-10 w-full">
+                    <div className="inline-flex items-center justify-center w-24 h-24 rounded-[40px] mb-8 shadow-2xl relative group overflow-hidden" style={{ background: '#020617', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span className="material-icons-round text-blue-500 text-5xl group-hover:scale-110 transition-transform">fingerprint</span>
+                        <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-1">Welcome Back</h1>
-                    <p className="text-sm text-white/45">Sign in to access your RoadHazardX dashboard</p>
+                    <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Access Node</h1>
+                    <p className="text-sm text-white/30 font-bold uppercase tracking-[0.2em] mt-2">Municipal Authentication</p>
                 </div>
 
-                {/* Top accent bar */}
-                <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-none" style={{ background: 'linear-gradient(90deg,#FF6B6B,#FF8E53,#FF6B6B)', backgroundSize: '200% 100%' }} />
+                {/* Firebase Auth */}
+                <div className="relative z-10 w-full max-w-xs space-y-6">
+                    <button 
+                        onClick={handleGoogleLogin}
+                        className="w-full flex items-center justify-center gap-4 bg-white/5 hover:bg-white/10 px-8 py-5 rounded-[24px] border border-white/5 hover:border-white/20 transition-all group active:scale-95 shadow-2xl"
+                    >
+                        <svg className="w-6 h-6" viewBox="0 0 48 48">
+                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                        </svg>
+                        <span className="text-white font-black text-sm tracking-wide">Login with Google</span>
+                    </button>
+                    
+                    <div className="flex items-center gap-4 px-6 opacity-20">
+                        <div className="flex-1 h-px bg-white"></div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Encrypted</span>
+                        <div className="flex-1 h-px bg-white"></div>
+                    </div>
 
-                {/* Clerk SignIn */}
-                <div className="relative z-10 w-full max-w-sm">
-                    <SignIn
-                        appearance={{
-                            variables: {
-                                colorPrimary: '#FF6B6B',
-                                colorBackground: 'transparent',
-                                colorText: '#fff',
-                                colorTextSecondary: 'rgba(255,255,255,0.5)',
-                                colorInputBackground: 'rgba(255,255,255,0.05)',
-                                colorInputText: '#fff',
-                                borderRadius: '12px',
-                                fontFamily: "'Outfit', sans-serif",
-                            },
-                            elements: {
-                                rootBox: 'w-full',
-                                card: 'bg-transparent shadow-none w-full p-0',
-                                headerTitle: 'hidden',
-                                headerSubtitle: 'hidden',
-                                header: 'hidden',
-
-                                // Social button
-                                socialButtonsBlockButton: [
-                                    'w-full flex items-center justify-center gap-3',
-                                    'rounded-xl py-3 px-4 font-semibold text-sm text-white',
-                                    'transition-all duration-200',
-                                ].join(' '),
-                                socialButtonsBlockButtonText: 'font-semibold text-white',
-
-                                // Hide "Last used" badge
-                                badge: 'hidden',
-
-                                // Divider
-                                dividerLine: 'bg-white/10',
-                                dividerText: 'text-white/35 text-xs uppercase tracking-widest',
-
-                                // Form fields
-                                formFieldLabel: 'text-white/60 text-sm font-medium mb-1',
-                                formFieldInput: [
-                                    'rounded-xl py-3 px-4 text-white text-sm',
-                                    'transition-all duration-200 outline-none',
-                                ].join(' '),
-                                formFieldInputShowPasswordButton: 'text-white/40 hover:text-white',
-
-                                // Primary button
-                                formButtonPrimary: [
-                                    'w-full rounded-xl py-3 font-bold text-white text-sm',
-                                    'transition-all duration-200',
-                                    'shadow-lg',
-                                ].join(' '),
-
-                                // Footer
-                                footerActionText: 'text-white/40 text-xs',
-                                footerActionLink: 'text-[#FF6B6B] font-semibold hover:text-[#FF8E53] transition-colors text-xs',
-                                footer: 'mt-2',
-
-                                identityPreviewText: 'text-white',
-                                identityPreviewEditButtonIcon: 'text-[#FF6B6B]',
-
-                                // Alert / error
-                                formFieldErrorText: 'text-red-400 text-xs mt-1',
-                                alertText: 'text-red-400 text-xs',
-                            },
-                        }}
-                    />
+                    <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                        <span className="material-icons-round text-xs">verified_user</span>
+                        Firebase Verified
+                    </div>
                 </div>
 
-                {/* Secured badge */}
-                <div className="relative z-10 mt-6 flex items-center gap-2 text-white/25 text-xs">
-                    <span className="material-icons-round text-sm">lock</span>
-                    <span>Secured by Clerk · End-to-end encrypted</span>
+                {/* Footer Security Badge */}
+                <div className="absolute bottom-8 flex items-center gap-2 text-white/20 text-[10px] font-bold uppercase tracking-widest leading-none">
+                    <span className="material-icons-round text-sm">shield</span>
+                    256-Bit SSL Secured
                 </div>
             </div>
 
-            {/* Global animations */}
             <style>{`
                 @keyframes pulse-slow { 0%,100%{opacity:0.6} 50%{opacity:1} }
                 .animate-pulse { animation: pulse-slow 2s cubic-bezier(0.4,0,0.6,1) infinite; }
-
-                @keyframes shimmer {
-                    0%   { background-position: 200% 0; }
-                    100% { background-position: -200% 0; }
-                }
-
-                /* Clerk overrides via CSS variables */
-                .cl-socialButtonsBlockButton {
-                    background: rgba(255,255,255,0.06) !important;
-                    border: 1px solid rgba(255,255,255,0.1) !important;
-                    position: relative !important;
-                    overflow: visible !important;
-                }
-
-                /* Hide the "Last used" badge — catch every possible Clerk class name */
-                [class*="badge"],
-                [class*="Badge"],
-                [class*="last-used"],
-                [class*="lastUsed"],
-                [data-localization-key*="lastUsed"],
-                [data-localization-key*="last_used"] {
-                    display: none !important;
-                }
-                .cl-socialButtonsBlockButton:hover {
-                    background: rgba(255,255,255,0.12) !important;
-                    border-color: rgba(255,107,107,0.4) !important;
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 20px rgba(255,107,107,0.15) !important;
-                }
-                .cl-formFieldInput {
-                    background: rgba(255,255,255,0.05) !important;
-                    border: 1px solid rgba(255,255,255,0.1) !important;
-                    color: #fff !important;
-                }
-                .cl-formFieldInput:focus {
-                    border-color: rgba(255,107,107,0.6) !important;
-                    box-shadow: 0 0 0 3px rgba(255,107,107,0.12) !important;
-                    background: rgba(255,255,255,0.08) !important;
-                }
-                .cl-formButtonPrimary {
-                    background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%) !important;
-                    border: none !important;
-                    box-shadow: 0 8px 24px rgba(255,107,107,0.35) !important;
-                }
-                .cl-formButtonPrimary:hover {
-                    opacity: 0.92 !important;
-                    box-shadow: 0 12px 32px rgba(255,107,107,0.5) !important;
-                    transform: translateY(-1px) !important;
-                }
-                .cl-card {
-                    background: transparent !important;
-                    box-shadow: none !important;
-                    border: none !important;
-                }
-                .cl-internal-b3fm6y {
-                    background: transparent !important;
-                }
-                .cl-footerAction {
-                    background: transparent !important;
-                }
             `}</style>
         </div>
     );
