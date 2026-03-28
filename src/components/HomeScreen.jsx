@@ -12,10 +12,21 @@ const HomeScreen = ({ isActive, toggleSidebar, navigateTo }) => {
 
             <div className="absolute top-4 left-4">
                 <button
-                    className="w-12 h-12 rounded-full bg-white/60 text-gray-800 backdrop-blur-md flex items-center justify-center shadow-sm hover:bg-white/80 transition-colors"
+                    className="w-12 h-12 rounded-full bg-white/60 text-gray-800 backdrop-blur-md flex items-center justify-center shadow-sm hover:bg-white/80 transition-all active:scale-90"
                     onClick={toggleSidebar}
+                    aria-label="Open Sidebar"
                 >
                     <span className="material-icons-round text-2xl">menu</span>
+                </button>
+            </div>
+
+            <div className="absolute top-4 right-4">
+                <button
+                    className="w-12 h-12 rounded-full bg-white/60 text-gray-800 backdrop-blur-md flex items-center justify-center shadow-sm hover:bg-white/80 transition-all active:scale-90"
+                    onClick={() => navigateTo('dashboard')}
+                    aria-label="Open Dashboard"
+                >
+                    <span className="material-icons-round text-2xl">grid_view</span>
                 </button>
             </div>
 

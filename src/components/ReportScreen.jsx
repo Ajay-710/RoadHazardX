@@ -290,6 +290,10 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
     };
 
     const handleSubmit = async () => {
+        if (!currentUserLocation) {
+            setValidationError('GPS is required to submit a report. Please enable your location services.');
+            return;
+        }
         if (!photoPreview && !hazardType) {
             setValidationError('Please capture a photo and select a hazard type before submitting.');
             return;
@@ -449,7 +453,7 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
         }
     };
 
-    const isReady = photoPreview && hazardType && !isProcessing;
+    const isReady = photoPreview && hazardType && !isProcessing && currentUserLocation;
 
     if (!isActive) return null;
 
@@ -845,31 +849,42 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                             width: '100%',
                             padding: '0.9rem 1rem',
                             borderRadius: '0.75rem',
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.10)',
+                            background: currentUserLocation ? 'rgba(74,222,128,0.06)' : 'rgba(251,191,36,0.06)',
+                            border: `1px solid ${currentUserLocation ? 'rgba(74,222,128,0.2)' : 'rgba(251,191,36,0.35)'}`,
                             display: 'flex', alignItems: 'center', gap: '0.6rem',
                             boxSizing: 'border-box',
+                            transition: 'all 0.3s ease',
                         }}>
                             <div style={{
                                 width: '1.8rem', height: '1.8rem', borderRadius: '50%',
-                                background: 'rgba(74,222,128,0.15)',
+                                background: currentUserLocation ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 flexShrink: 0,
                             }}>
-                                <span className="material-icons-round" style={{ color: '#4ade80', fontSize: '1rem' }}>my_location</span>
+                                <span className="material-icons-round" style={{ 
+                                    color: currentUserLocation ? '#4ade80' : '#fbbf24', 
+                                    fontSize: '1rem' 
+                                }}>
+                                    {currentUserLocation ? 'my_location' : 'location_off'}
+                                </span>
                             </div>
-                            <span style={{ color: currentUserLocation ? '#4ade80' : '#fbbf24', fontSize: '0.9rem', fontWeight: 500 }}>
+                            <span style={{ 
+                                color: currentUserLocation ? '#fff' : '#fbbf24', 
+                                fontSize: '0.9rem', 
+                                fontWeight: 500 
+                            }}>
                                 {currentUserLocation
-                                    ? `${currentUserLocation.lat.toFixed(4)}, ${currentUserLocation.lng.toFixed(4)}`
-                                    : 'Default Location (GPS Disabled)'}
+                                    ? `LIVE: ${currentUserLocation.lat.toFixed(6)}, ${currentUserLocation.lng.toFixed(6)}`
+                                    : 'GPS Signal Required'}
                             </span>
-                            {/* Pulsing dot */}
+                            {/* Pulsing dot indicator */}
                             <div style={{
                                 marginLeft: 'auto',
-                                width: '0.55rem', height: '0.55rem', borderRadius: '50%',
-                                background: '#4ade80',
-                                animation: 'pulse-dot 2s ease-in-out infinite',
+                                width: '0.6rem', height: '0.6rem', borderRadius: '50%',
+                                background: currentUserLocation ? '#4ade80' : 'rgba(251,191,36,0.3)',
+                                animation: currentUserLocation ? 'pulse-dot 2s ease-in-out infinite' : 'none',
                                 flexShrink: 0,
+                                boxShadow: currentUserLocation ? '0 0 10px #4ade80' : 'none',
                             }} />
                         </div>
                     </div>

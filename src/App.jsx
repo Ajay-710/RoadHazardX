@@ -23,6 +23,25 @@ function App() {
     
     const [user, setUser] = useState(null);
     const [isAuthLoaded, setIsAuthLoaded] = useState(false);
+    const [currentUserLocation, setCurrentUserLocation] = useState(null);
+
+    // Track User Location
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+        
+        const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                setCurrentUserLocation({
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                });
+            },
+            (err) => console.warn("GPS Error:", err),
+            { enableHighAccuracy: true }
+        );
+        
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (authUser) => {
@@ -145,7 +164,19 @@ function App() {
                     />
                     <ReportScreen
                         isActive={currentScreen === 'report'}
-                        submitReport={submitReport}
+                        navigateTo={navigateTo}
+                        currentUserLocation={currentUserLocation}
+                        onSubmit={(type, img, conf, status, addr) => {
+                            submitReport({
+                                type,
+                                image: img,
+                                lat: currentUserLocation?.lat,
+                                lng: currentUserLocation?.lng,
+                                confidence: conf,
+                                status,
+                                address: addr
+                            });
+                        }}
                         isUploading={isUploading}
                     />
                     <MapScreen
