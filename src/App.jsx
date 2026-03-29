@@ -183,6 +183,7 @@ function App() {
                         isActive={currentScreen === 'map'}
                         hazards={hazards}
                         toggleSidebar={toggleSidebar}
+                        navigateTo={navigateTo}
                     />
                     <DashboardScreen
                         isActive={currentScreen === 'dashboard'}
