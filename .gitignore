@@ -6,3 +6,4 @@ dist
 .env.*
 !.env.example
 RoadHazeX_Backend/firebase-key.json
+venv/

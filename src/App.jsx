@@ -4,13 +4,23 @@ import HomeScreen from './components/HomeScreen';
 import ReportScreen from './components/ReportScreen';
 import MapScreen from './components/MapScreen';
 import DashboardScreen from './components/DashboardScreen';
+<<<<<<< HEAD
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+import LoginScreen from './components/LoginScreen';
+import SuccessOverlay from './components/SuccessOverlay';
+
+import { db, storage } from './firebase';
+import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+=======
 import LoginScreen from './components/LoginScreen';
 import SuccessOverlay from './components/SuccessOverlay';
 
 import { db, storage, auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth'; 
 import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+>>>>>>> 65b72dc6ef6c1ab45332d956d099c6ff98f620da
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import * as turf from '@turf/turf';
 
 
 import HeroSection from './components/HeroSection';
@@ -57,6 +67,8 @@ function App() {
         });
         return () => unsubscribe();
     }, [currentScreen]);
+
+    const { user } = useUser();
 
     const [hazards, setHazards] = useState([]);
 
@@ -107,9 +119,46 @@ function App() {
                 resolved: false
             };
 
+<<<<<<< HEAD
+            if (duplicateDoc && duplicateDoc.id) {
+                // Update existing hazard
+                const docRef = doc(db, "hazards", duplicateDoc.id);
+                const updatedHazard = {
+                    reportCount: (duplicateDoc.reportCount || 1) + 1,
+                    lastReported: serverTimestamp(),
+                    verification_status: verificationStatus,
+                    // If current status is resolved but new report comes in, reactivate it? 
+                    // Usually we don't merge into resolved ones (filtered above)
+                };
+                await updateDoc(docRef, updatedHazard);
+                console.log("🔄 Duplicate detected. Incremented report count for:", duplicateDoc.id);
+                setSuccessData({ ...duplicateDoc, ...updatedHazard, image: imageBase64 });
+            } else {
+                // Create new hazard
+                const newHazard = {
+                    type,
+                    lat: snappedLoc.lat,
+                    lng: snappedLoc.lng,
+                    address: address, // From reverse geocoding
+                    image: imageUrl,
+                    reportCount: 1,
+                    status: 'Pending', // Initial municipal status
+                    verification_status: verificationStatus,
+                    resolved: false,
+                    timestamp: serverTimestamp(),
+                    lastReported: serverTimestamp(),
+                    confidence: confidence || 1.0,
+                    user_id: user?.id || 'anonymous'
+                };
+                
+                await addDoc(collection(db, "hazards"), newHazard);
+                setSuccessData({ ...newHazard, image: imageBase64 });
+            }
+=======
             await addDoc(collection(db, 'hazards'), docData);
             setSuccessData(docData);
             setCurrentScreen('home');
+>>>>>>> 65b72dc6ef6c1ab45332d956d099c6ff98f620da
         } catch (error) {
             console.error("Firebase submit error:", error);
             alert("Error reporting hazard: " + error.message);
@@ -203,9 +252,72 @@ function App() {
     };
 
     return (
+<<<<<<< HEAD
+        <main id="app">
+            <SuccessOverlay visible={!!successData} hazardData={successData} onDone={handleSuccessDone} />
+            
+            {/* Global Uploading Overlay */}
+            {isUploading && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '60px', height: '60px', border: '5px solid rgba(255,255,255,0.1)', borderTopColor: '#4ade80', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <span style={{ color: 'white', marginTop: '1.5rem', fontWeight: 600, fontSize: '1.1rem', letterSpacing: '0.05em' }}>Syncing Hazard to Cloud...</span>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem', fontSize: '0.85rem' }}>Uploading Image & GeoData</span>
+                </div>
+            )}
+
+            <SignedOut>
+                {currentScreen === 'hero' ? (
+                    <HeroSection onGetStarted={() => navigateTo('login')} />
+                ) : (
+                    <LoginScreen onBack={() => navigateTo('hero')} />
+                )}
+            </SignedOut>
+            <SignedIn>
+                {currentScreen === 'hero' ? (
+                    <HeroSection onGetStarted={() => navigateTo('home')} />
+                ) : (
+                    <>
+                        <Sidebar
+                            isOpen={isSidebarOpen}
+                            toggleSidebar={toggleSidebar}
+                            navigateTo={navigateTo}
+                        />
+
+                        <HomeScreen
+                            isActive={currentScreen === 'home'}
+                            toggleSidebar={toggleSidebar}
+                            navigateTo={navigateTo}
+                        />
+
+                        <ReportScreen
+                            isActive={currentScreen === 'report'}
+                            navigateTo={navigateTo}
+                            currentUserLocation={userLocation}
+                            onSubmit={submitReport}
+                        />
+
+                        <MapScreen
+                            isActive={currentScreen === 'map'}
+                            toggleSidebar={toggleSidebar}
+                            currentUserLocation={userLocation}
+                            hazards={hazards.filter(h => !h.resolved)}
+                        />
+
+                        <DashboardScreen
+                            isActive={currentScreen === 'dashboard'}
+                            navigateTo={navigateTo}
+                            hazards={hazards}
+                            currentUser={user}
+                        />
+                    </>
+                )}
+            </SignedIn>
+        </main>
+=======
         <div className={`relative w-full ${currentScreen === 'hero' ? 'min-h-screen' : 'h-screen overflow-hidden'} bg-bg-gradient shadow-2xl`}>
             {renderContent()}
         </div>
+>>>>>>> 65b72dc6ef6c1ab45332d956d099c6ff98f620da
     );
 }
 

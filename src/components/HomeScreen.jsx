@@ -10,7 +10,7 @@ const HomeScreen = ({ isActive, toggleSidebar, navigateTo }) => {
         >
             <div className="absolute inset-0 bg-blue-50/80 -z-10"></div>
 
-            <div className="absolute top-4 left-4">
+            <div className="absolute top-4 left-4 z-50">
                 <button
                     className="w-12 h-12 rounded-full bg-white/60 text-gray-800 backdrop-blur-md flex items-center justify-center shadow-sm hover:bg-white/80 transition-all active:scale-90"
                     onClick={toggleSidebar}

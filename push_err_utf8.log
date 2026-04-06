@@ -1,0 +1,20 @@
+﻿git : remote: error: Trace: 
+d482b1b4c247ab48e6330f5ac8503410ebc6d52336cc5771835005478199b774   
+     
+At line:1 char:1
++ git push -f origin main 2> push_err.log
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (remote: error: ...199 
+   b774        :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+remote: error: See https://gh.io/lfs for more information.        
+remote: error: File venv/Lib/site-packages/torch/lib/torch_cpu.dll 
+is 253.51 MB; this exceeds GitHub's file size limit of 100.00 MB   
+     
+remote: error: GH001: Large files detected. You may want to try 
+Git Large File Storage - https://git-lfs.github.com.        
+To https://github.com/Ajay-710/RoadHazardX.git
+ ! [remote rejected]   main -> main (pre-receive hook declined)
+error: failed to push some refs to 
+'https://github.com/Ajay-710/RoadHazardX.git'

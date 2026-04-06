@@ -3,23 +3,7 @@ import maplibregl from 'maplibre-gl';
 import { db } from './firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-const SEVERITY_WEIGHTS = {
-    "Road accidents": 10,
-    "Fallen trees": 9,
-    "Missing signboards": 8,
-    "Damaged manholes": 8,
-    "Non-functioning traffic signals": 8,
-    "Waterlogging / flooded roads": 7,
-    "Potholes": 6,
-    "Improperly placed barricades": 6,
-    "Debris on road": 5,
-    "Low visibility zones": 5,
-    "Broken or bent traffic signs": 4,
-    "Road cracks": 3,
-    "Uneven roads": 3,
-    "Non-working street lights": 3,
-    "Vehicle breakdown": 2
-};
+
 
 const STATUS_THEMES = {
     "Pending": { color: "#ef4444", bg: "bg-red-500/10", border: "border-red-500/20", text: "text-red-400", pill: "bg-red-500", glow: "shadow-[0_0_20px_rgba(239,68,68,0.4)]" },
@@ -34,28 +18,16 @@ const AdminDashboard = ({ hazards, userRole }) => {
     const [filterStatus, setFilterStatus] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // --- Priority Sorting Logic ---
+    // --- Priority Sorting Logic (Dynamic Leaderboard based on report counts) ---
     const processedHazards = useMemo(() => {
         return hazards.map(h => {
-            const severity = SEVERITY_WEIGHTS[h.type] || 5;
             const count = h.reportCount || 1;
-            
-            let timeDecay = 1;
-            if (h.lastReported?.seconds) {
-                const last = h.lastReported.seconds * 1000;
-                const diffDays = Math.max(0, (Date.now() - last) / (1000 * 60 * 60 * 24));
-                timeDecay = 1 + (diffDays * 0.1); 
-            }
-
-            const rawScore = severity * count;
-            const finalScore = (rawScore / timeDecay).toFixed(1);
-            
             return {
                 ...h,
-                priorityScore: parseFloat(finalScore),
-                isCritical: parseFloat(finalScore) > 25
+                priorityRate: count,
+                isCritical: count >= 5
             };
-        }).sort((a, b) => b.priorityScore - a.priorityScore);
+        }).sort((a, b) => b.priorityRate - a.priorityRate);
     }, [hazards]);
 
     const filteredHazards = processedHazards.filter(h => {
@@ -99,6 +71,8 @@ const AdminDashboard = ({ hazards, userRole }) => {
         markersRef.current = [];
 
         filteredHazards.forEach(hazard => {
+            if (typeof hazard.lng !== 'number' || typeof hazard.lat !== 'number') return;
+
             const theme = STATUS_THEMES[hazard.status || 'Pending'];
             const el = document.createElement('div');
             el.className = `w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer border border-white/20 transition-all hover:scale-125 hover:z-50 ${theme.pill} ${theme.glow}`;
@@ -192,7 +166,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                              </div>
                         </div>
 
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide py-1">
+                        <div className="flex gap-2 overflow-x-auto pb-1 py-1 custom-scrollbar">
                             {['All', 'Pending', 'In Progress', 'Resolved'].map(stat => (
                                 <button 
                                     key={stat}
@@ -209,7 +183,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                     </div>
 
                     {/* Infinite Hazard List */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
+                    <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-4 pr-2 custom-scrollbar">
                         {filteredHazards.map((hazard) => {
                              const theme = STATUS_THEMES[hazard.status || 'Pending'];
                              return (
@@ -217,7 +191,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                                     key={hazard.id}
                                     onClick={() => {
                                         setSelectedHazard(hazard);
-                                        mapRef.current.flyTo({ center: [hazard.lng, hazard.lat], zoom: 17 });
+                                        mapRef.current.flyTo({ center: [hazard.lng, hazard.lat], zoom: 17, padding: { left: 420, right: 460 }, duration: 1500 });
                                     }}
                                     className={`group p-5 rounded-[32px] border transition-all cursor-pointer relative overflow-hidden
                                         ${selectedHazard?.id === hazard.id 
@@ -233,8 +207,8 @@ const AdminDashboard = ({ hazards, userRole }) => {
                                             {hazard.status || 'Pending'}
                                         </div>
                                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/5">
-                                            <span className="material-icons-round text-blue-400 text-xs">analytics</span>
-                                            <span className="text-[10px] font-black text-slate-400">{hazard.priorityScore}</span>
+                                            <span className="material-icons-round text-blue-400 text-xs">group</span>
+                                            <span className="text-[10px] font-black text-slate-400">Rate: {hazard.priorityRate}</span>
                                         </div>
                                     </div>
                                     
@@ -267,7 +241,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
 
                 {/* Map Interface */}
                 <main className="flex-1 relative bg-slate-950">
-                    <div ref={mapContainerRef} className="absolute inset-0 grayscale-[0.2] contrast-[1.1] brightness-[0.9]" />
+                    <div ref={mapContainerRef} className="absolute inset-0" />
                     
                     {/* Gradient Overlays for Cinematic Feel */}
                     <div className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-slate-950 to-transparent pointer-events-none"></div>
@@ -307,15 +281,15 @@ const AdminDashboard = ({ hazards, userRole }) => {
                                  </div>
                              </div>
 
-                             <div className="p-10 flex-1 overflow-y-auto space-y-10 scrollbar-hide">
+                             <div className="p-10 flex-1 overflow-y-auto min-h-0 space-y-10 custom-scrollbar pr-6">
                                  <div className="grid grid-cols-2 gap-6">
                                      <div className="bg-white/5 p-6 rounded-[36px] border border-white/5 text-center transition-transform hover:scale-[1.02]">
                                          <div className="text-5xl font-black text-white tracking-tighter leading-none">{selectedHazard.reportCount || 1}</div>
                                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-3">Reports Sync</p>
                                      </div>
                                      <div className="bg-blue-500/10 p-6 rounded-[36px] border border-blue-500/20 text-center transition-transform hover:scale-[1.02]">
-                                         <div className="text-5xl font-black text-blue-400 tracking-tighter leading-none">{selectedHazard.priorityScore}</div>
-                                         <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mt-3">Priority Score</p>
+                                         <div className="text-5xl font-black text-blue-400 tracking-tighter leading-none">{selectedHazard.priorityRate}</div>
+                                         <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mt-3">Priority Rate</p>
                                      </div>
                                  </div>
 
