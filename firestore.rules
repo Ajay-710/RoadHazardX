@@ -5,8 +5,8 @@ service cloud.firestore {
       // Anyone can read hazards for public map safety
       allow read: if true;
       
-      // Only authenticated users can submit new reports
-      allow create: if request.auth != null;
+      // Allow anyone to submit new reports
+      allow create: if true;
       
       // Only accounts with the 'admin' role in the /users collection can modify data
       allow update, delete: if request.auth != null && 

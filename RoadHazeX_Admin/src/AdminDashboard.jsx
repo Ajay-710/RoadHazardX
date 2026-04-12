@@ -71,11 +71,13 @@ const AdminDashboard = ({ hazards, userRole }) => {
         markersRef.current = [];
 
         filteredHazards.forEach(hazard => {
-            if (typeof hazard.lng !== 'number' || typeof hazard.lat !== 'number') return;
+            const hLng = Number(hazard.lng);
+            const hLat = Number(hazard.lat);
+            if (isNaN(hLng) || isNaN(hLat)) return;
 
             const theme = STATUS_THEMES[hazard.status || 'Pending'];
             const el = document.createElement('div');
-            el.className = `w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer border border-white/20 transition-all hover:scale-125 hover:z-50 ${theme.pill} ${theme.glow}`;
+            el.className = `w-8 h-8 rounded-full flex items-center justify-center cursor-pointer border-2 shadow-lg transition-transform hover:scale-125 hover:z-50 ${theme.pill}`;
             
             if (hazard.isCritical && hazard.status === 'Pending') {
                 el.innerHTML = `<div class="absolute inset-0 rounded-2xl animate-ping bg-red-500 opacity-40"></div>`;
@@ -88,11 +90,11 @@ const AdminDashboard = ({ hazards, userRole }) => {
 
             el.onclick = () => {
                 setSelectedHazard(hazard);
-                mapRef.current.flyTo({ center: [hazard.lng, hazard.lat], zoom: 16, duration: 1500 });
+                mapRef.current.flyTo({ center: [hLng, hLat], zoom: 16, duration: 1500 });
             };
 
             const marker = new maplibregl.Marker({ element: el })
-                .setLngLat([hazard.lng, hazard.lat])
+                .setLngLat([hLng, hLat])
                 .addTo(mapRef.current);
             
             markersRef.current.push(marker);
@@ -141,9 +143,9 @@ const AdminDashboard = ({ hazards, userRole }) => {
             {/* Main Area */}
             <div className="flex-1 flex overflow-hidden relative">
                 {/* Left Panel: Analytics & List */}
-                <aside className="w-[420px] shrink-0 border-r border-white/5 bg-slate-950/50 flex flex-col z-20">
+                <aside className="w-[420px] h-full shrink-0 border-r border-white/5 bg-slate-950/50 flex flex-col z-20">
                     {/* Search & Stats */}
-                    <div className="p-6 space-y-6 bg-slate-900/40 border-b border-white/5">
+                    <div className="p-6 shrink-0 space-y-6 bg-slate-900/40 border-b border-white/5">
                         <div className="relative group">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 material-icons-round text-slate-500 group-focus-within:text-blue-400 transition-colors">travel_explore</span>
                             <input 
@@ -183,7 +185,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                     </div>
 
                     {/* Infinite Hazard List */}
-                    <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-4 pr-2 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 pr-2 custom-scrollbar">
                         {filteredHazards.map((hazard) => {
                              const theme = STATUS_THEMES[hazard.status || 'Pending'];
                              return (

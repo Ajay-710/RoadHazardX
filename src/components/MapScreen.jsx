@@ -129,6 +129,13 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
     // Phase 15: Safest Route Engine
     const [alternativeRoutes, setAlternativeRoutes] = useState([]);
     const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+
+    // Auto-update times & routes when travel mode changes
+    useEffect(() => {
+        if (navPhase >= 2 && selectedSource && selectedDestination) {
+             calculateRoutes();
+        }
+    }, [travelMode, routePreference]);
     const [isCalculatingSafety, setIsCalculatingSafety] = useState(false);
 
     // Phase 16: Roads API
@@ -587,7 +594,9 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
         markersRef.current = [];
 
         hazards.forEach(h => {
-            if (!h.lat || !h.lng || isNaN(h.lat) || isNaN(h.lng)) return;
+            const hLng = Number(h.lng);
+            const hLat = Number(h.lat);
+            if (isNaN(hLng) || isNaN(hLat)) return;
 
             const el = document.createElement('div');
             el.className = 'hazard-marker-custom';
@@ -597,67 +606,23 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
             else if (h.type === 'Waterlogging / flooded roads') borderColor = '#3b82f6'; // Blue
             else if (h.type === 'Uneven roads') borderColor = '#f59e0b'; // Amber
 
-            if (h.image) {
-                el.innerHTML = `
-                    <div style="
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
-                        cursor: pointer;
-                    ">
-                        <div class="pulsing-hazard" style="
-                            width: 52px;
-                            height: 52px;
-                            border-radius: 50% 50% 50% 0;
-                            transform: rotate(-45deg);
-                            overflow: hidden;
-                            border: 3px solid ${borderColor};
-                            background: ${borderColor};
-                            box-shadow: 0 0 15px ${borderColor}88;
-                            flex-shrink: 0;
-                            transition: transform 0.2s;
-                            position: relative;
-                        " onmouseover="this.style.transform='rotate(-45deg) scale(1.1)'"
-                          onmouseout="this.style.transform='rotate(-45deg) scale(1)'">
-                            <div style="
-                                width: 100%;
-                                height: 100%;
-                                transform: rotate(45deg);
-                                background-image: url('${h.image}');
-                                background-size: cover;
-                                background-position: center;
-                                opacity: ${h.resolved ? '0.6' : '1'};
-                            "></div>
-                            ${h.resolved ? `
-                            <div style="
-                                position: absolute;
-                                inset: 0;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                transform: rotate(45deg);
-                                color: white;
-                                font-weight: bold;
-                                font-size: 24px;
-                                text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                            ">✓</div>
-                            ` : ''}
-                        </div>
-                    </div>`;
-            } else {
-                // Fallback icon
-                el.innerHTML = `
-                <div style="
-                    width: 22px;
-                    height: 22px;
-                    background: ${borderColor};
-                    border-radius: 50%;
-                    border: 3px solid white;
-                    box-shadow: 0 0 8px rgba(0,0,0,0.4);
-                    cursor: pointer;
-                "></div>`;
-            }
+            el.innerHTML = `
+            <div style="
+                width: 32px;
+                height: 32px;
+                background: ${borderColor};
+                border-radius: 50% 50% 50% 0;
+                transform: rotate(-45deg);
+                border: 2px solid white;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: transform 0.2s;
+            " onmouseover="this.style.transform='rotate(-45deg) scale(1.1)'" onmouseout="this.style.transform='rotate(-45deg) scale(1)'">
+                <span class="material-icons-round" style="color: white; font-size: 16px; transform: rotate(45deg);">${h.resolved ? 'check' : 'warning'}</span>
+            </div>`;
 
             // Clean custom popups
             const popupHTML = `
@@ -694,13 +659,13 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                 .setHTML(popupHTML);
 
             const marker = new maplibregl.Marker({ element: el })
-                .setLngLat([h.lng, h.lat])
+                .setLngLat([hLng, hLat])
                 .setPopup(popup)
                 .addTo(mapInstanceRef.current);
 
             // Fly to marker instead of showing warning text
             el.addEventListener('click', () => {
-                 mapInstanceRef.current.flyTo({ center: [h.lng, h.lat], zoom: 16 });
+                 mapInstanceRef.current.flyTo({ center: [hLng, hLat], zoom: 16 });
             });
 
             markersRef.current.push(marker);

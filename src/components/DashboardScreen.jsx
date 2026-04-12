@@ -5,9 +5,10 @@ import { doc, updateDoc } from 'firebase/firestore';
 const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser }) => {
     if (!isActive) return null;
 
-    const userHazards = hazards.filter(h => h.user_id === currentUser?.id);
+    const userHazards = hazards.filter(h => h.userId === currentUser?.uid || h.user_id === currentUser?.uid || h.user_id === currentUser?.id);
     const activeHazards = userHazards.filter(h => !h.resolved);
     const resolvedHazards = userHazards.filter(h => h.resolved);
+    const handleFleetUpload = (e) => { e.preventDefault(); alert("Fleet tracking not available yet."); };
 
     // AI Stats Calculation
     const typeDistribution = hazards.reduce((acc, h) => {
@@ -188,8 +189,8 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser }) => {
                                 </button>
                             </div>
                         </div>
-                    )}
-                </div>
+                    ))
+                )}
             </div>
 
             {/* Bottom Accent Line */}
