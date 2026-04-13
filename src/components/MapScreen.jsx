@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Globe } from './ui/Globe';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import polyline from '@mapbox/polyline';
@@ -1570,9 +1571,13 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
     if (!isActive) return null;
 
     return (
-        <section className="absolute inset-0 flex flex-col bg-bg-gradient z-10">
-            <div className="relative w-full h-full overflow-hidden bg-gray-200">
-                <div id="map" ref={mapRef} style={{ width: '100%', height: '100%' }} className="z-0"></div>
+        <section className="absolute inset-0 flex flex-col bg-[#020617] z-10">
+            <div className="relative w-full h-full overflow-hidden">
+                {/* Background Globe Pattern */}
+                <div className="absolute inset-0 z-[-1] opacity-30 pointer-events-none flex items-center justify-center">
+                    <Globe size="120%" className="scale-150 rotate-12" />
+                </div>
+                <div id="map" ref={mapRef} style={{ width: '100%', height: '100%' }} className="z-0 bg-transparent"></div>
 
                 {/* Speed Limit Indicator (Visible only during navigation) */}
                 {navPhase === 3 && currentSpeedLimit && (

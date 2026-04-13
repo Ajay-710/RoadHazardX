@@ -20,16 +20,6 @@ const HomeScreen = ({ isActive, toggleSidebar, navigateTo }) => {
                 </button>
             </div>
 
-            <div className="absolute top-4 right-4">
-                <button
-                    className="w-12 h-12 rounded-full bg-white/60 text-gray-800 backdrop-blur-md flex items-center justify-center shadow-sm hover:bg-white/80 transition-all active:scale-90"
-                    onClick={() => navigateTo('dashboard')}
-                    aria-label="Open Dashboard"
-                >
-                    <span className="material-icons-round text-2xl">grid_view</span>
-                </button>
-            </div>
-
             <div className="flex flex-col gap-10 items-center justify-center w-full animate-slide-up">
                 <button
                     className="w-56 h-56 rounded-full bg-red-500 shadow-[0_10px_25px_rgba(239,68,68,0.4)] text-white font-bold text-3xl leading-tight flex flex-col items-center justify-center transform transition-transform active:scale-95 hover:scale-105"

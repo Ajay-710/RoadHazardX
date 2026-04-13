@@ -5,13 +5,16 @@ import { doc, updateDoc } from 'firebase/firestore';
 const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSidebar }) => {
     if (!isActive) return null;
 
-    const userHazards = hazards.filter(h => h.userId === currentUser?.uid || h.user_id === currentUser?.uid || h.user_id === currentUser?.id);
+    const userHazards = hazards.filter(h => {
+        if (!currentUser || !currentUser.uid) return false;
+        return h.userId === currentUser.uid || h.user_id === currentUser.uid;
+    });
     const activeHazards = userHazards.filter(h => !h.resolved);
     const resolvedHazards = userHazards.filter(h => h.resolved);
     const handleFleetUpload = (e) => { e.preventDefault(); alert("Fleet tracking not available yet."); };
 
     // AI Stats Calculation
-    const typeDistribution = hazards.reduce((acc, h) => {
+    const typeDistribution = userHazards.reduce((acc, h) => {
         acc[h.type] = (acc[h.type] || 0) + 1;
         return acc;
     }, {});
@@ -106,7 +109,7 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
                     
                     <div className="space-y-4">
                         {sortedTypes.map(([type, count], i) => {
-                            const percent = (count / (hazards.length || 1) * 100).toFixed(0);
+                            const percent = (count / (userHazards.length || 1) * 100).toFixed(0);
                             return (
                                 <div key={i} className="group">
                                     <div className="flex justify-between items-end mb-1.5">
@@ -130,13 +133,13 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
             <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-200 sticky top-0 bg-transparent backdrop-blur-md py-2 z-10">Recent Reports</h3>
 
-                {hazards.length === 0 ? (
+                {userHazards.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 text-gray-400">
                         <span className="material-icons-round text-4xl mb-2">check_circle</span>
                         <p>No hazards reported yet.</p>
                     </div>
                 ) : (
-                    hazards.map((hazard, index) => (
+                    userHazards.map((hazard, index) => (
                         <div key={index} className="glass-panel p-4 rounded-2xl flex items-center gap-4 hover:bg-white/10 transition-colors animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
                             <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden shrink-0 border border-white/10">
                                 {hazard.image ? (

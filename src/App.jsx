@@ -150,6 +150,7 @@ function App() {
                     isOpen={isSidebarOpen} 
                     toggleSidebar={toggleSidebar} 
                     navigateTo={navigateTo} 
+                    currentScreen={currentScreen}
                 />
 
                 <main className="relative w-full h-full transition-transform duration-300">
@@ -157,6 +158,7 @@ function App() {
                         isActive={currentScreen === 'home'}
                         navigateTo={navigateTo}
                         hazards={hazards}
+                        toggleSidebar={toggleSidebar}
                     />
                     <ReportScreen
                         isActive={currentScreen === 'report'}

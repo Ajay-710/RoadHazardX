@@ -1,4 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Globe } from './ui/Globe';
+import { 
+    Construction, 
+    TrafficEvent, 
+    Tree, 
+    WarningAlt, 
+    Cloud, 
+    CheckmarkFilled,
+    ChevronDown,
+    ChevronUp
+} from '@carbon/icons-react';
 
 /* ─── Animated background canvas ─── */
 function RoadBg() {
@@ -193,6 +204,40 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
     const [cameraHovered, setCameraHovered] = useState(false);
     const [submitHovered, setSubmitHovered] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [expandedCategory, setExpandedCategory] = useState(null);
+
+    const HAZARD_CATEGORIES = [
+        {
+            id: 'infra',
+            label: 'Road Infrastructure',
+            icon: Construction,
+            items: ['Pothole', 'Unrepaired/Damaged Manhole', 'Broken Road Surface']
+        },
+        {
+            id: 'traffic',
+            label: 'Traffic System',
+            icon: TrafficEvent,
+            items: ['Traffic Signal Issue', 'Traffic Sign Damage', 'Streetlight Not Working', 'Missing Signboard', 'Improper Barricade']
+        },
+        {
+            id: 'env',
+            label: 'Environmental',
+            icon: Tree,
+            items: ['Tree Obstruction', 'Debris on Road']
+        },
+        {
+            id: 'emergency',
+            label: 'Emergency',
+            icon: WarningAlt,
+            items: ['Road Accident', 'Vehicle Breakdown']
+        },
+        {
+            id: 'climatic',
+            label: 'Climatic',
+            icon: Cloud,
+            items: ['Waterlogging', 'Low Visibility']
+        }
+    ];
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -370,11 +415,10 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
             }
             const data = await apiRes.json();
 
-            // --- New Enhancement: Reverse Geocoding for readable address ---
+            // --- Geocoding for readable address ---
             let readableAddress = "Unknown Location";
             try {
                 const OLA_MAPS_API_KEY = "ZTQwHjxak23hMQ4ewtLTUzwMX9l6lJta0bL2uYv6";
-                // Get coordinates from photo metadata or current location
                 const lat = currentUserLocation?.lat || 12.9716;
                 const lng = currentUserLocation?.lng || 77.5946;
                 
@@ -386,23 +430,17 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
             } catch (err) {
                 console.warn("Reverse Geocoding failed:", err);
             }
-            // -------------------------------------------------------------
 
-            // Handle V2 Response with Validation Logic (Step 8)
             if (data.prediction) {
                 const aiStatus = data.status === true ? 'Verified' : 'Mismatch';
                 
                 if (data.status === true) {
-                    // Success Match
                     onSubmit(hazardType, photoPreview, data.confidence, aiStatus, readableAddress);
                 } else {
-                    // Mismatch Detected (Step 8 Logic)
                     const msg = `AI processing: You selected "${hazardType}" and AI predicted "${data.prediction}", Are you sure?`;
                     setValidationError(msg);
                     setForceSubmitAllowed(true);
                     
-                    // If user clicks "Sure" afterwards, we'll call onSubmit with 'Mismatch'
-                    // We need to persist these values for the force-submit click
                     window._pendingHazardData = { 
                         type: hazardType, 
                         img: photoPreview, 
@@ -424,16 +462,9 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
             }
         } catch (err) {
             console.error("AI Error:", err);
-            
-            let descriptiveError = "AI processing unreachable. You can still 'Submit' to manually report this hazard.";
-            if (window.location.protocol === 'https:' && LOCAL_API_URL.startsWith('http://')) {
-                descriptiveError = "Security Block: The hosted site (HTTPS) cannot reach your Local API (HTTP). Please use a secure tunnel (Ngrok/Localtunnel HTTPS) or the Hugging Face fallback.";
-            }
-
-            setValidationError(descriptiveError);
+            setValidationError("AI processing unreachable. You can still 'Submit' to manually report.");
             setForceSubmitAllowed(true);
             
-            // Fallback for unreachable AI
             window._pendingHazardData = { 
                 type: hazardType, 
                 img: photoPreview, 
@@ -460,7 +491,6 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
                 }}>
-                    {/* Close button */}
                     <button
                         onClick={stopCamera}
                         aria-label="Close camera"
@@ -476,34 +506,22 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                         <span className="material-icons-round" style={{ color: '#fff', fontSize: '1.4rem' }}>close</span>
                     </button>
 
-                    {!mockMode
-                        ? (
-                            <video
-                                ref={videoRef}
-                                id="camera-feed"
-                                autoPlay
-                                playsInline
-                                muted
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                        ) : (
-                            <div style={{
-                                width: '100%', height: '100%',
-                                display: 'flex', flexDirection: 'column',
-                                alignItems: 'center', justifyContent: 'center',
-                                background: '#1a1a1a', color: '#888', gap: '0.75rem',
-                            }}>
-                                <span className="material-icons-round" style={{ fontSize: '3.5rem', color: '#555' }}>videocam_off</span>
-                                <span style={{ fontSize: '1rem' }}>Camera unavailable — tap shutter for mock photo</span>
-                            </div>
-                        )
-                    }
+                    {!mockMode ? (
+                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                        <div style={{
+                            width: '100%', height: '100%',
+                            display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', justifyContent: 'center',
+                            background: '#1a1a1a', color: '#888', gap: '0.75rem',
+                        }}>
+                            <span className="material-icons-round" style={{ fontSize: '3.5rem', color: '#555' }}>videocam_off</span>
+                            <span style={{ fontSize: '1rem' }}>Camera unavailable — tap shutter for mock photo</span>
+                        </div>
+                    )}
 
-                    {/* Shutter button */}
                     <button
-                        id="fullscreen-shutter-btn"
                         onClick={capturePhoto}
-                        aria-label="Capture photo"
                         style={{
                             position: 'absolute', bottom: '2.5rem',
                             left: '50%', transform: 'translateX(-50%)',
@@ -514,528 +532,212 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                             cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             zIndex: 10001,
-                            transition: 'transform 0.1s, box-shadow 0.1s',
-                        }}
-                        onMouseDown={e => {
-                            e.currentTarget.style.transform = 'translateX(-50%) scale(0.88)';
-                        }}
-                        onMouseUp={e => {
-                            e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-                        }}
-                        onTouchStart={e => {
-                            e.currentTarget.style.transform = 'translateX(-50%) scale(0.88)';
-                        }}
-                        onTouchEnd={e => {
-                            e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+                            transition: 'transform 0.1s',
                         }}
                     >
-                        <div style={{
-                            width: '3.5rem', height: '3.5rem', borderRadius: '50%',
-                            border: '2.5px solid #333', background: 'transparent',
-                        }} />
+                        <div style={{ width: '3.5rem', height: '3.5rem', borderRadius: '50%', border: '2.5px solid #333' }} />
                     </button>
-
                     <canvas ref={canvasRef} style={{ display: 'none' }} />
                 </div>
             )}
 
             {/* ── Report form ── */}
-            <section className="absolute inset-0 flex flex-col z-10 animate-fade-in overflow-y-auto" style={{ fontFamily: "'Outfit', sans-serif", background: 'transparent', paddingBottom: '6rem' }}>
+            <section className="absolute inset-0 z-10 animate-fade-in flex items-center justify-center p-4 lg:p-8 overflow-y-auto no-scrollbar bg-[#020617] lg:overflow-hidden">
+                
+                <div className="fixed top-0 left-0 right-0 h-[3px] z-[100] animate-gradient" style={{ background: 'var(--background-image-primary-gradient)' }} />
 
-                {/* Animated background canvas */}
-                <RoadBg />
+                <div className="w-full max-w-6xl rounded-[2.5rem] border border-white/10 bg-white/5 backdrop-blur-3xl overflow-hidden relative shadow-2xl flex flex-col lg:flex-row max-h-[95vh] lg:h-[800px]">
+                    
+                    <div className="absolute top-0 right-1/4 w-96 h-96 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
-                {/* Top accent bar */}
-                <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-                    background: 'linear-gradient(90deg,#FF6B6B,#FF8E53,#FF6B6B)',
-                    backgroundSize: '200% 100%',
-                    animation: 'gradientShift 4s ease infinite',
-                    zIndex: 2,
-                }} />
-
-                {/* Header */}
-                <div className="flex items-center gap-4 p-6 relative z-10">
-                    <button
-                        className="p-2 rounded-full transition-all duration-200"
-                        style={{
-                            background: 'rgba(255,255,255,0.08)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            backdropFilter: 'blur(8px)',
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = 'rgba(255,107,107,0.18)';
-                            e.currentTarget.style.borderColor = 'rgba(255,107,107,0.4)';
-                            e.currentTarget.style.transform = 'scale(1.08)';
-                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(255,107,107,0.2)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = 'none';
-                        }}
-                        onClick={() => navigateTo('home')}
-                    >
-                        <span className="material-icons-round text-white">arrow_back</span>
-                    </button>
-
-                    {/* Icon + Title */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{
-                            width: '2.4rem', height: '2.4rem', borderRadius: '0.75rem',
-                            background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 4px 16px rgba(255,107,107,0.35)',
-                        }}>
-                            <span className="material-icons-round text-white" style={{ fontSize: '1.2rem' }}>warning</span>
+                    <div className="flex-1 flex flex-col p-6 md:p-10 relative z-10 overflow-y-auto no-scrollbar scroll-smooth">
+                        
+                        <div className="flex items-center justify-between mb-8 sticky top-0 bg-transparent z-20 pb-2">
+                             <div className="flex items-center gap-4">
+                                <button
+                                    className="p-2.5 rounded-full transition-all duration-300 bg-white/5 border border-white/10 backdrop-blur-md hover:bg-red-500/20 hover:border-red-500/40 active:scale-90 group"
+                                    onClick={() => navigateTo('home')}
+                                >
+                                    <span className="material-icons-round text-white transition-transform group-hover:-translate-x-1">arrow_back</span>
+                                </button>
+                                <div className="flex items-center gap-3">
+                                     <div className="w-10 h-10 rounded-[1rem] flex items-center justify-center shadow-lg" style={{ background: 'var(--background-image-primary-gradient)' }}>
+                                         <span className="material-icons-round text-white text-lg">warning</span>
+                                     </div>
+                                     <h2 className="text-2xl font-bold text-white tracking-tight">Report Hazard</h2>
+                                </div>
+                             </div>
+                             
+                             <div className="hidden sm:flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-1.5 text-[10px] font-bold text-neutral-300 uppercase tracking-widest backdrop-blur-xl">
+                                <span className={`size-2 rounded-full animate-pulse shadow-sm ${currentUserLocation ? "bg-emerald-400" : "bg-amber-400"}`} />
+                                {currentUserLocation ? "GPS Active" : "Searching Location"}
+                             </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-white">Report Hazard</h2>
-                    </div>
-                </div>
 
-                {/* Card */}
-                <div style={{
-                    margin: '0 1rem 2rem',
-                    padding: '1.75rem',
-                    borderRadius: '1.5rem',
-                    background: 'rgba(255,255,255,0.07)',
-                    backdropFilter: 'blur(24px)',
-                    border: '1px solid rgba(255,255,255,0.13)',
-                    boxShadow: '0 24px 64px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
-                    maxWidth: '36rem',
-                    alignSelf: 'center',
-                    width: '100%',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    zIndex: 2,
-                }}>
-
-                    {/* Inner shimmer line */}
-                    <div style={{
-                        position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
-                        background: 'linear-gradient(90deg, transparent, rgba(255,107,107,0.5), rgba(255,142,83,0.5), transparent)',
-                    }} />
-
-                    {/* ── Camera tap area ── */}
-                    <div
-                        onClick={openCamera}
-                        onMouseEnter={() => setCameraHovered(true)}
-                        onMouseLeave={() => setCameraHovered(false)}
-                        style={{
-                            border: `2px dashed ${cameraHovered ? 'rgba(255,107,107,0.55)' : 'rgba(255,255,255,0.2)'}`,
-                            borderRadius: '1rem',
-                            height: '16rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: '1.5rem',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            background: cameraHovered
-                                ? 'rgba(255,107,107,0.08)'
-                                : 'rgba(0,0,0,0.18)',
-                            transition: 'all 0.3s ease',
-                            transform: cameraHovered ? 'scale(1.005)' : 'scale(1)',
-                            boxShadow: cameraHovered
-                                ? '0 0 0 1px rgba(255,107,107,0.2), inset 0 0 30px rgba(255,107,107,0.06)'
-                                : 'none',
-                        }}
-                    >
-                        {!photoPreview && (
-                            <div style={{
-                                display: 'flex', flexDirection: 'column',
-                                alignItems: 'center', gap: '0.5rem',
-                                transition: 'transform 0.3s ease',
-                                transform: cameraHovered ? 'translateY(-4px)' : 'translateY(0)',
-                            }}>
-                                {/* Camera icon with glow ring */}
-                                <div style={{
-                                    width: '4rem', height: '4rem', borderRadius: '50%',
-                                    background: cameraHovered
-                                        ? 'linear-gradient(135deg,#FF6B6B,#FF8E53)'
-                                        : 'rgba(255,255,255,0.1)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    marginBottom: '0.5rem',
-                                    boxShadow: cameraHovered ? '0 8px 24px rgba(255,107,107,0.4)' : 'none',
-                                    transition: 'all 0.3s ease',
-                                }}>
-                                    <span className="material-icons-round" style={{
-                                        fontSize: '1.8rem',
-                                        color: cameraHovered ? '#fff' : 'rgba(255,255,255,0.7)',
-                                        transition: 'color 0.3s',
-                                    }}>photo_camera</span>
-                                </div>
-                                <p style={{
-                                    fontSize: '0.875rem',
-                                    fontWeight: 600,
-                                    color: cameraHovered ? 'rgba(255,107,107,0.9)' : 'rgba(255,255,255,0.6)',
-                                    transition: 'color 0.3s',
-                                    letterSpacing: '0.02em',
-                                }}>Tap to Open Camera</p>
-                                <p style={{
-                                    fontSize: '0.72rem',
-                                    color: 'rgba(255,255,255,0.3)',
-                                    marginTop: '0.1rem',
-                                }}>Capture the road hazard</p>
-                            </div>
-                        )}
-
-                        {photoPreview && (
-                            <>
-                                <img
-                                    src={photoPreview}
-                                    alt="Captured hazard"
-                                    style={{
-                                        width: '100%', height: '100%',
-                                        objectFit: 'cover', borderRadius: '0.875rem', display: 'block',
-                                        transition: 'opacity 0.3s',
-                                        opacity: cameraHovered ? 0.85 : 1,
-                                    }}
-                                />
-                                {/* Retake overlay */}
-                                <div style={{
-                                    position: 'absolute', inset: 0,
-                                    background: 'rgba(0,0,0,0.45)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    opacity: cameraHovered ? 1 : 0,
-                                    transition: 'opacity 0.3s',
-                                    borderRadius: '0.875rem',
-                                }}>
-                                    <div style={{
-                                        display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                        background: 'rgba(255,107,107,0.2)',
-                                        border: '1px solid rgba(255,107,107,0.5)',
-                                        borderRadius: '2rem',
-                                        padding: '0.5rem 1.25rem',
-                                        backdropFilter: 'blur(8px)',
-                                    }}>
-                                        <span className="material-icons-round" style={{ color: '#fff', fontSize: '1.1rem' }}>refresh</span>
-                                        <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>Retake Photo</span>
-                                    </div>
-                                </div>
-                                {/* Success badge */}
-                                <div style={{
-                                    position: 'absolute', bottom: 10, right: 10,
-                                    background: 'rgba(0,0,0,0.55)', borderRadius: '0.75rem',
-                                    padding: '4px 12px',
-                                    display: 'flex', alignItems: 'center', gap: 6,
-                                    backdropFilter: 'blur(6px)',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    opacity: cameraHovered ? 0 : 1,
-                                    transition: 'opacity 0.3s',
-                                }}>
-                                    <span className="material-icons-round" style={{ color: '#4ade80', fontSize: '0.9rem' }}>check_circle</span>
-                                    <span style={{ color: '#fff', fontSize: '0.72rem', fontWeight: 500 }}>Photo Captured</span>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* ── Hazard Type selector ── */}
-                    <div style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
-                        <label style={{
-                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                            marginBottom: '0.5rem',
-                            color: 'rgba(255,255,255,0.6)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.06em',
-                        }}>
-                            <span className="material-icons-round" style={{ fontSize: '0.95rem', color: '#FF6B6B' }}>report_problem</span>
-                            Hazard Type
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <select
-                                style={{
-                                    width: '100%',
-                                    padding: '0.9rem 1rem',
-                                    paddingRight: '2.5rem',
-                                    borderRadius: '0.75rem',
-                                    background: 'rgba(255,255,255,0.06)',
-                                    border: `1px solid ${hazardType ? 'rgba(255,107,107,0.45)' : 'rgba(255,255,255,0.12)'}`,
-                                    color: hazardType ? '#fff' : 'rgba(255,255,255,0.45)',
-                                    fontSize: '0.95rem',
-                                    outline: 'none',
-                                    cursor: 'pointer',
-                                    appearance: 'none',
-                                    WebkitAppearance: 'none',
-                                    transition: 'border-color 0.3s, box-shadow 0.3s',
-                                    boxShadow: hazardType ? '0 0 0 3px rgba(255,107,107,0.12)' : 'none',
-                                }}
-                                value={hazardType}
-                                onChange={(e) => {
-                                    setHazardType(e.target.value);
-                                    setValidationError('');
-                                    setForceSubmitAllowed(false);
-                                }}
-                                onFocus={e => {
-                                    e.currentTarget.style.borderColor = 'rgba(255,107,107,0.6)';
-                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,107,107,0.14)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
-                                }}
-                                onBlur={e => {
-                                    e.currentTarget.style.borderColor = hazardType ? 'rgba(255,107,107,0.45)' : 'rgba(255,255,255,0.12)';
-                                    e.currentTarget.style.boxShadow = hazardType ? '0 0 0 3px rgba(255,107,107,0.12)' : 'none';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                                }}
+                        <div className="flex flex-col gap-6">
+                            {/* Camera Area */}
+                            <div
+                                onClick={openCamera}
+                                onMouseEnter={() => setCameraHovered(true)}
+                                onMouseLeave={() => setCameraHovered(false)}
+                                className={`relative rounded-3xl border-2 border-dashed transition-all duration-300 h-64 flex items-center justify-center cursor-pointer overflow-hidden ${
+                                    cameraHovered ? 'border-primary/50 bg-primary/10 scale-[1.01]' : 'border-white/20 bg-black/20'
+                                }`}
                             >
-                                <option value="" disabled style={{ background: '#1e2d4a', color: '#888' }}>Select Hazard Type</option>
-                                <option value="" disabled style={{ background: '#1e2d4a', color: '#888' }}>--- ROAD HAZARDS CATEGORY 🚦 ---</option>
-                                <optgroup label="1️⃣ Road Infrastructure Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Potholes" style={{ background: '#1e2d4a' }}>Potholes</option>
-                                    <option value="Road cracks" style={{ background: '#1e2d4a' }}>Road cracks</option>
-                                    <option value="Uneven roads" style={{ background: '#1e2d4a' }}>Uneven roads</option>
-                                    <option value="Damaged manholes" style={{ background: '#1e2d4a' }}>Damaged manholes</option>
-                                </optgroup>
-                                <optgroup label="2️⃣ Traffic System Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Non-functioning traffic signals" style={{ background: '#1e2d4a' }}>Non-functioning traffic signals</option>
-                                    <option value="Broken or bent traffic signs" style={{ background: '#1e2d4a' }}>Broken or bent traffic signs</option>
-                                    <option value="Non-working street lights" style={{ background: '#1e2d4a' }}>Non-working street lights</option>
-                                    <option value="Missing signboards" style={{ background: '#1e2d4a' }}>Missing signboards</option>
-                                    <option value="Improperly placed barricades" style={{ background: '#1e2d4a' }}>Improperly placed barricades</option>
-                                </optgroup>
-                                <optgroup label="3️⃣ Environmental Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Fallen trees" style={{ background: '#1e2d4a' }}>Fallen trees</option>
-                                    <option value="Debris on road" style={{ background: '#1e2d4a' }}>Debris on road</option>
-                                </optgroup>
-                                <optgroup label="4️⃣ Emergency Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Road accidents" style={{ background: '#1e2d4a' }}>Road accidents</option>
-                                    <option value="Vehicle breakdown" style={{ background: '#1e2d4a' }}>Vehicle breakdown</option>
-                                </optgroup>
-                                <optgroup label="5️⃣ Climatic Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Waterlogging / flooded roads" style={{ background: '#1e2d4a' }}>Waterlogging / flooded roads</option>
-                                    <option value="Low visibility zones" style={{ background: '#1e2d4a' }}>Low visibility zones (due to Fog, Mist, etc.)</option>
-                                </optgroup>
-                            </select>
-                            {/* Custom chevron */}
-                            <span className="material-icons-round" style={{
-                                position: 'absolute', right: '0.75rem', top: '50%',
-                                transform: 'translateY(-50%)',
-                                color: hazardType ? '#FF6B6B' : 'rgba(255,255,255,0.35)',
-                                fontSize: '1.2rem',
-                                pointerEvents: 'none',
-                                transition: 'color 0.3s',
-                            }}>expand_more</span>
-                        </div>
-                    </div>
+                                {!photoPreview ? (
+                                    <div className="flex flex-col items-center gap-4">
+                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${cameraHovered ? 'bg-primary shadow-lg shadow-primary/40' : 'bg-white/10'}`}>
+                                            <span className="material-icons-round text-3xl text-white">photo_camera</span>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-sm font-bold text-neutral-200">Tap to Open Camera</p>
+                                            <p className="text-xs text-neutral-500">Capture the road hazard</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <img src={photoPreview} className="w-full h-full object-cover" alt="Hazard" />
+                                        <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${cameraHovered ? 'opacity-100' : 'opacity-0'}`}>
+                                            <div className="bg-primary/20 border border-primary/50 rounded-full px-5 py-2 backdrop-blur-md flex items-center gap-2">
+                                                <span className="material-icons-round text-white">refresh</span>
+                                                <span className="text-white text-sm font-bold">Retake</span>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
 
-                    {/* ── Location ── */}
-                    <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-                        <label style={{
-                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                            marginBottom: '0.5rem',
-                            color: 'rgba(255,255,255,0.6)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.06em',
-                        }}>
-                            <span className="material-icons-round" style={{ fontSize: '0.95rem', color: '#FF6B6B' }}>location_on</span>
-                            Location
-                        </label>
-                        <div style={{
-                            width: '100%',
-                            padding: '0.9rem 1rem',
-                            borderRadius: '0.75rem',
-                            background: currentUserLocation ? 'rgba(74,222,128,0.06)' : 'rgba(251,191,36,0.06)',
-                            border: `1px solid ${currentUserLocation ? 'rgba(74,222,128,0.2)' : 'rgba(251,191,36,0.35)'}`,
-                            display: 'flex', alignItems: 'center', gap: '0.6rem',
-                            boxSizing: 'border-box',
-                            transition: 'all 0.3s ease',
-                        }}>
-                            <div style={{
-                                width: '1.8rem', height: '1.8rem', borderRadius: '50%',
-                                background: currentUserLocation ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0,
-                            }}>
-                                <span className="material-icons-round" style={{ 
-                                    color: currentUserLocation ? '#4ade80' : '#fbbf24', 
-                                    fontSize: '1rem' 
-                                }}>
-                                    {currentUserLocation ? 'my_location' : 'location_off'}
+                            {/* Hazard Classification UI */}
+                            <div className="group">
+                                <label className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-neutral-500 group-hover:text-primary transition-colors">
+                                     <div className="size-1.5 rounded-full bg-primary shadow-sm" />
+                                     Hazard Classification
+                                </label>
+                                
+                                <div className="flex flex-col gap-3">
+                                    {HAZARD_CATEGORIES.map((cat) => (
+                                        <div key={cat.id} className="flex flex-col">
+                                            <button 
+                                                onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
+                                                className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                                                    expandedCategory === cat.id || cat.items.includes(hazardType)
+                                                    ? 'bg-white/10 border-white/20 shadow-lg' 
+                                                    : 'bg-white/5 border-white/5 hover:bg-white/8'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`p-2.5 rounded-xl transition-all ${cat.items.includes(hazardType) ? 'bg-primary/20 text-primary' : 'bg-white/5 text-neutral-500'}`}>
+                                                        <cat.icon size={20} />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className={`text-sm font-bold ${cat.items.includes(hazardType) ? 'text-white' : 'text-neutral-400'}`}>{cat.label}</p>
+                                                        {cat.items.includes(hazardType) && (
+                                                            <p className="text-[10px] text-primary/80 font-bold uppercase tracking-tighter">{hazardType}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {expandedCategory === cat.id ? <ChevronUp size={20} className="text-neutral-500" /> : <ChevronDown size={20} className="text-neutral-500" />}
+                                            </button>
+
+                                            <div className={`overflow-hidden transition-all duration-300 ${expandedCategory === cat.id ? 'max-h-96 mt-2 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                                <div className="grid grid-cols-1 gap-1.5 p-2 bg-black/30 rounded-2xl border border-white/5 mx-2">
+                                                    {cat.items.map(opt => (
+                                                        <button
+                                                            key={opt}
+                                                            onClick={() => { setHazardType(opt); setExpandedCategory(null); setValidationError(''); }}
+                                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${hazardType === opt ? 'bg-primary/20 border border-primary/30 text-white' : 'hover:bg-white/5 text-neutral-500'}`}
+                                                        >
+                                                            <div className={`size-1.5 rounded-full ${hazardType === opt ? 'bg-primary' : 'bg-white/20'}`} />
+                                                            <span className="text-[13px] font-medium">{opt}</span>
+                                                            {hazardType === opt && <CheckmarkFilled size={16} className="ml-auto text-emerald-400" />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Location Section */}
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neutral-500">
+                                     <span className="material-icons-round text-primary text-sm">location_on</span>
+                                     Geo-Positioning
+                                </label>
+                                <div className={`w-full p-4 rounded-2xl border flex items-center gap-4 transition-all ${currentUserLocation ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+                                    <div className={`p-2 rounded-full ${currentUserLocation ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                        <span className="material-icons-round text-lg">{currentUserLocation ? 'my_location' : 'location_off'}</span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className={`text-sm font-bold ${currentUserLocation ? 'text-white' : 'text-amber-500'}`}>
+                                            {currentUserLocation ? 'Location Locked' : 'GPS Signal Required'}
+                                        </p>
+                                        <p className="text-[11px] text-neutral-500 font-medium">
+                                            {currentUserLocation ? `${currentUserLocation.lat.toFixed(6)}, ${currentUserLocation.lng.toFixed(6)}` : 'Scanning for satellites...'}
+                                        </p>
+                                    </div>
+                                    {currentUserLocation && <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />}
+                                </div>
+                            </div>
+
+                            {/* Error Message */}
+                            {validationError && (
+                                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 animate-shake">
+                                    <span className="material-icons-round text-red-500 text-lg">error_outline</span>
+                                    <p className="text-xs text-red-400 leading-relaxed font-medium">{validationError}</p>
+                                </div>
+                            )}
+
+                            {/* Submit Button */}
+                            <button
+                                onClick={handleSubmit}
+                                onMouseEnter={() => setSubmitHovered(true)}
+                                onMouseLeave={() => setSubmitHovered(false)}
+                                className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all ${
+                                    isReady 
+                                    ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-95' 
+                                    : 'bg-white/5 border border-white/5 text-neutral-600 cursor-not-allowed'
+                                }`}
+                            >
+                                {isProcessing ? (
+                                    <span className="material-icons-round animate-spin">autorenew</span>
+                                ) : (
+                                    <span className="material-icons-round">{isReady ? 'send' : 'lock'}</span>
+                                )}
+                                {isProcessing ? 'AI Processing...' : forceSubmitAllowed ? 'Confirm Manual Submission' : 'Submit Hazard Report'}
+                            </button>
+
+                            {/* Progress Indicators */}
+                            <div className="flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest">
+                                <span className={`flex items-center gap-1.5 ${photoPreview ? 'text-emerald-400' : 'text-neutral-600'}`}>
+                                    <CheckmarkFilled size={12} /> Photo
+                                </span>
+                                <div className="w-4 h-px bg-white/10" />
+                                <span className={`flex items-center gap-1.5 ${hazardType ? 'text-emerald-400' : 'text-neutral-600'}`}>
+                                    <CheckmarkFilled size={12} /> Classification
                                 </span>
                             </div>
-                            <span style={{ 
-                                color: currentUserLocation ? '#fff' : '#fbbf24', 
-                                fontSize: '0.9rem', 
-                                fontWeight: 500 
-                            }}>
-                                {currentUserLocation
-                                    ? `LIVE: ${currentUserLocation.lat.toFixed(6)}, ${currentUserLocation.lng.toFixed(6)}`
-                                    : 'GPS Signal Required'}
-                            </span>
-                            {/* Pulsing dot indicator */}
-                            <div style={{
-                                marginLeft: 'auto',
-                                width: '0.6rem', height: '0.6rem', borderRadius: '50%',
-                                background: currentUserLocation ? '#4ade80' : 'rgba(251,191,36,0.3)',
-                                animation: currentUserLocation ? 'pulse-dot 2s ease-in-out infinite' : 'none',
-                                flexShrink: 0,
-                                boxShadow: currentUserLocation ? '0 0 10px #4ade80' : 'none',
-                            }} />
                         </div>
                     </div>
 
-                    {/* ── Validation error ── */}
-                    {validationError && (
-                        <div style={{
-                            marginBottom: '1rem',
-                            display: 'flex', alignItems: 'flex-start', gap: '0.8rem',
-                            background: 'rgba(239,68,68,0.18)',
-                            border: '1px solid rgba(239,68,68,0.5)',
-                            borderRadius: '0.875rem',
-                            padding: '1rem',
-                            backdropFilter: 'blur(12px)',
-                            boxShadow: '0 8px 32px rgba(239,68,68,0.15)',
-                            animation: 'fadeIn 0.3s ease-out',
-                        }}>
-                            <span className="material-icons-round" style={{ color: '#f87171', fontSize: '1.4rem', marginTop: '2px' }}>warning_amber</span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                <span style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>Action Required</span>
-                                <span style={{ color: '#fca5a5', fontSize: '0.85rem', lineHeight: '1.4' }}>{validationError}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── Submit button ── */}
-                    <button
-                        id="submit-report-btn"
-                        onClick={handleSubmit}
-                        onMouseEnter={() => setSubmitHovered(true)}
-                        onMouseLeave={() => setSubmitHovered(false)}
-                        style={{
-                            width: '100%',
-                            padding: '1rem',
-                            borderRadius: '0.875rem',
-                            fontWeight: 700,
-                            fontSize: '1rem',
-                            border: 'none',
-                            cursor: isReady ? 'pointer' : 'not-allowed',
-                            transition: 'all 0.25s ease',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            letterSpacing: '0.02em',
-                            ...(isReady ? {
-                                background: forceSubmitAllowed
-                                    ? (submitHovered ? 'linear-gradient(135deg,#b91c1c,#dc2626)' : 'linear-gradient(135deg,#dc2626,#b91c1c)')
-                                    : (submitHovered ? 'linear-gradient(135deg,#FF8E53,#FF6B6B)' : 'linear-gradient(135deg,#FF6B6B,#FF8E53)'),
-                                color: '#fff',
-                                boxShadow: submitHovered
-                                    ? (forceSubmitAllowed ? '0 12px 36px rgba(220,38,38,0.55), 0 4px 12px rgba(0,0,0,0.2)' : '0 12px 36px rgba(255,107,107,0.55), 0 4px 12px rgba(0,0,0,0.2)')
-                                    : (forceSubmitAllowed ? '0 6px 24px rgba(220,38,38,0.35)' : '0 6px 24px rgba(255,107,107,0.35)'),
-                                transform: submitHovered ? 'translateY(-2px) scale(1.012)' : 'translateY(0) scale(1)',
-                            } : {
-                                background: 'rgba(255,255,255,0.07)',
-                                color: 'rgba(255,255,255,0.3)',
-                                boxShadow: 'none',
-                                transform: 'none',
-                            }),
-                        }}
-                    >
-                        {/* Shimmer layer on hover */}
-                        {isReady && submitHovered && (
-                            <div style={{
-                                position: 'absolute', inset: 0,
-                                background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 55%, transparent 70%)',
-                                animation: 'shimmer-sweep 0.6s ease forwards',
-                                pointerEvents: 'none',
-                            }} />
-                        )}
-
-                        <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                            {isProcessing ? (
-                                <>
-                                    <span className="material-icons-round" style={{ fontSize: '1.2rem', animation: 'spin 1s linear infinite' }}>autorenew</span>
-                                    AI Processing...
-                                </>
-                            ) : forceSubmitAllowed ? (
-                                <>
-                                    <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>gpp_bad</span>
-                                    Override AI & Force Submit
-                                </>
-                            ) : (
-                                <>
-                                    <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>
-                                        {isReady ? 'send' : 'lock'}
-                                    </span>
-                                    Submit Report
-                                </>
-                            )}
-                        </span>
-                    </button>
-
-                    {/* Progress pills */}
-                    <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.5rem', marginTop: '1.25rem',
-                    }}>
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '0.35rem',
-                            padding: '0.35rem 0.75rem',
-                            borderRadius: '2rem',
-                            background: photoPreview ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${photoPreview ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                            transition: 'all 0.3s ease',
-                        }}>
-                            <span className="material-icons-round" style={{
-                                fontSize: '0.85rem',
-                                color: photoPreview ? '#4ade80' : 'rgba(255,255,255,0.3)',
-                                transition: 'color 0.3s',
-                            }}>{photoPreview ? 'check_circle' : 'photo_camera'}</span>
-                            <span style={{
-                                fontSize: '0.72rem', fontWeight: 600,
-                                color: photoPreview ? '#4ade80' : 'rgba(255,255,255,0.3)',
-                                transition: 'color 0.3s',
-                            }}>Photo</span>
-                        </div>
-
-                        <div style={{
-                            width: '1.5rem', height: '1px',
-                            background: isReady ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.1)',
-                            transition: 'background 0.3s',
-                        }} />
-
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '0.35rem',
-                            padding: '0.35rem 0.75rem',
-                            borderRadius: '2rem',
-                            background: hazardType ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${hazardType ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                            transition: 'all 0.3s ease',
-                        }}>
-                            <span className="material-icons-round" style={{
-                                fontSize: '0.85rem',
-                                color: hazardType ? '#4ade80' : 'rgba(255,255,255,0.3)',
-                                transition: 'color 0.3s',
-                            }}>{hazardType ? 'check_circle' : 'report_problem'}</span>
-                            <span style={{
-                                fontSize: '0.72rem', fontWeight: 600,
-                                color: hazardType ? '#4ade80' : 'rgba(255,255,255,0.3)',
-                                transition: 'color 0.3s',
-                            }}>Hazard Type</span>
-                        </div>
+                    <div className="flex-1 hidden lg:flex items-center justify-center p-8 bg-black/20 border-l border-white/5 relative">
+                         <div className="absolute top-10 left-10 py-1.5 px-4 bg-white/5 border border-white/10 rounded-full flex items-center gap-2 backdrop-blur-md">
+                            <span className="size-1.5 rounded-full bg-blue-400 animate-pulse" />
+                            <span className="text-[10px] font-bold text-blue-300 tracking-widest uppercase">Global Edge Node</span>
+                         </div>
+                         <div className="w-full h-full flex items-center justify-center transition-transform hover:scale-[1.02]">
+                            <Globe size={460} />
+                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* Keyframe injections */}
             <style>{`
-                @keyframes pulse-dot {
-                    0%, 100% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.5; transform: scale(0.75); }
-                }
-                @keyframes shimmer-sweep {
-                    0%   { transform: translateX(-100%); }
-                    100% { transform: translateX(200%); }
-                }
-                @keyframes spin {
-                    100% { transform: rotate(360deg); }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-4px); }
+                    75% { transform: translateX(4px); }
                 }
             `}</style>
         </>
