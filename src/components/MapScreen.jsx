@@ -389,8 +389,8 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
         let score = 0;
         
         hazards.forEach(h => {
-            if (h.resolved || !h.lat || !h.lng) return;
-            const pt = turf.point([h.lng, h.lat]);
+            if (h.resolved || !h.lat || !h.lng || isNaN(Number(h.lng)) || isNaN(Number(h.lat))) return;
+            const pt = turf.point([Number(h.lng), Number(h.lat)]);
             // Distance in meters
             const dist = turf.pointToLineDistance(pt, poly, { units: 'meters' });
             
@@ -442,8 +442,8 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
             let severeAccidentSoon = null;
 
             hazards.forEach(h => {
-                if (h.resolved || !h.lat || !h.lng) return;
-                const hazardPt = turf.point([h.lng, h.lat]);
+                if (h.resolved || !h.lat || !h.lng || isNaN(Number(h.lng)) || isNaN(Number(h.lat))) return;
+                const hazardPt = turf.point([Number(h.lng), Number(h.lat)]);
                 const dist = turf.distance(userPt, hazardPt, { units: 'kilometers' });
                 
                 // Track nearest for general warning
@@ -493,8 +493,8 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
     // Phase 33: Arrival Detection
     useEffect(() => {
         if (navPhase === 3 && currentUserLocation && selectedDestination && !arrivalSpokenRef.current) {
-            const userPt = turf.point([currentUserLocation.lng, currentUserLocation.lat]);
-            const destPt = turf.point([selectedDestination.lng, selectedDestination.lat]);
+            const userPt = turf.point([Number(currentUserLocation.lng), Number(currentUserLocation.lat)]);
+            const destPt = turf.point([Number(selectedDestination.lng), Number(selectedDestination.lat)]);
             const dist = turf.distance(userPt, destPt, { units: 'kilometers' });
 
             if (dist < 0.03) { // 30 meters
@@ -1283,8 +1283,11 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
             return;
         }
         setShowNearbyMenu(false);
-        const userPt = turf.point([currentUserLocation.lng, currentUserLocation.lat]);
-        const sorted = [...hazards].map(h => ({ ...h, dist: turf.distance(userPt, turf.point([h.lng, h.lat])) }))
+        const userPt = turf.point([Number(currentUserLocation.lng), Number(currentUserLocation.lat)]);
+        const sorted = [...hazards].map(h => {
+            if (isNaN(Number(h.lng)) || isNaN(Number(h.lat))) return { ...h, dist: Infinity };
+            return { ...h, dist: turf.distance(userPt, turf.point([Number(h.lng), Number(h.lat)])) };
+        })
             .sort((a,b) => a.dist - b.dist).slice(0, 3);
             
         if(sorted.length === 0) return;

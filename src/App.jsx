@@ -187,6 +187,7 @@ function App() {
                         hazards={hazards}
                         navigateTo={navigateTo}
                         currentUser={user}
+                        toggleSidebar={toggleSidebar}
                     />
                 </main>
 

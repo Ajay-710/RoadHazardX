@@ -2,7 +2,7 @@ import React from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser }) => {
+const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSidebar }) => {
     if (!isActive) return null;
 
     const userHazards = hazards.filter(h => h.userId === currentUser?.uid || h.user_id === currentUser?.uid || h.user_id === currentUser?.id);
@@ -57,6 +57,16 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser }) => {
                              Real-time Monitoring Active
                          </span>
                      </div>
+                     <div className="w-px h-8 bg-white/10 mx-2"></div>
+                     <button onClick={toggleSidebar} className="w-10 h-10 rounded-full border-2 border-white/10 overflow-hidden shadow-lg transition-transform hover:scale-105 active:scale-95">
+                         {currentUser?.photoURL ? (
+                             <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                         ) : (
+                             <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-blue-500 to-cyan-500">
+                                 <span className="material-icons-round text-white text-[20px]">person</span>
+                             </div>
+                         )}
+                     </button>
                 </div>
             </div>
 
