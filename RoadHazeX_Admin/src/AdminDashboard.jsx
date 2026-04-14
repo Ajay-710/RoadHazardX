@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import { db } from './firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import * as turf from '@turf/turf';
 
 
 
@@ -21,16 +22,48 @@ const AdminDashboard = ({ hazards, userRole }) => {
     const [filterStatus, setFilterStatus] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // --- Priority Sorting Logic (Dynamic Leaderboard based on report counts) ---
+    // --- Dynamic Spatial Clustering Logic ---
     const processedHazards = useMemo(() => {
-        return hazards.map(h => {
-            const count = h.reportCount || 1;
-            return {
-                ...h,
-                priorityRate: count,
-                isCritical: count >= 5
-            };
-        }).sort((a, b) => b.priorityRate - a.priorityRate);
+        const clusters = [];
+        
+        hazards.forEach(h => {
+            const hLng = Number(h.lng);
+            const hLat = Number(h.lat);
+            if (isNaN(hLng) || isNaN(hLat)) return;
+
+            let merged = false;
+            for (let c of clusters) {
+                // Merge if same type, same status, and within 50 meters
+                if (c.type === h.type && c.status === h.status) {
+                    const from = turf.point([c.lng, c.lat]);
+                    const to = turf.point([hLng, hLat]);
+                    const distance = turf.distance(from, to, { units: 'meters' });
+                    
+                    if (distance < 50) {
+                        c.ids = [...(c.ids || [c.id]), h.id];
+                        c.priorityRate += (h.reportCount || 1);
+                        c.reportCount = c.priorityRate;
+                        c.isCritical = c.priorityRate >= 5;
+                        merged = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!merged) {
+                clusters.push({
+                    ...h,
+                    lng: hLng,
+                    lat: hLat,
+                    ids: [h.id],
+                    priorityRate: h.reportCount || 1,
+                    reportCount: h.reportCount || 1,
+                    isCritical: (h.reportCount || 1) >= 5
+                });
+            }
+        });
+        
+        return clusters.sort((a, b) => b.priorityRate - a.priorityRate);
     }, [hazards]);
 
     const filteredHazards = processedHazards.filter(h => {
@@ -104,12 +137,25 @@ const AdminDashboard = ({ hazards, userRole }) => {
         });
     };
 
-    const handleStatusUpdate = async (id, newStatus) => {
+    const handleStatusUpdate = async (idOrIds, newStatus) => {
         try {
-            const docRef = doc(db, 'hazards', id);
-            const updates = { status: newStatus, resolved: newStatus === 'Resolved' };
-            await updateDoc(docRef, updates);
-            setSelectedHazard(prev => prev ? { ...prev, ...updates } : null);
+            const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+            const promises = ids.map(id => {
+                const docRef = doc(db, 'hazards', id);
+                return updateDoc(docRef, { 
+                    status: newStatus, 
+                    resolved: newStatus === 'Resolved' 
+                });
+            });
+            await Promise.all(promises);
+            setSelectedHazard(prev => {
+                if (!prev) return null;
+                const prevIds = Array.isArray(prev.ids) ? prev.ids : [prev.id];
+                if (prevIds.some(pid => ids.includes(pid))) {
+                     return { ...prev, status: newStatus, resolved: newStatus === 'Resolved' };
+                }
+                return prev;
+            });
         } catch (err) { console.error(err); }
     };
 
@@ -335,7 +381,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                                          {['Pending', 'In Progress', 'Resolved'].map(s => (
                                              <button 
                                                 key={s}
-                                                onClick={() => handleStatusUpdate(selectedHazard.id, s)}
+                                                onClick={() => handleStatusUpdate(selectedHazard.ids || selectedHazard.id, s)}
                                                 className={`group w-full py-5 rounded-[24px] text-xs font-black transition-all border flex items-center justify-between px-8
                                                     ${selectedHazard.status === s 
                                                         ? 'bg-white text-slate-950 border-white shadow-[0_20px_40px_rgba(255,255,255,0.1)] scale-[1.03]' 
