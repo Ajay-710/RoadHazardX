@@ -194,8 +194,12 @@ const LOCAL_API_URL = "http://127.0.0.1:5000/predict";
 const HF_SPACE_URL = "https://vijaydevaraj-vlm-clip-model.hf.space/predict"; 
 // ---------------------
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) => {
+    const { t } = useLanguage();
     const [cameraActive, setCameraActive] = useState(false);
+    // ... rest of state
     const [photoPreview, setPhotoPreview] = useState(null);
     const [hazardType, setHazardType] = useState('');
     const [mockMode, setMockMode] = useState(false);
@@ -209,31 +213,31 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
     const HAZARD_CATEGORIES = [
         {
             id: 'infra',
-            label: 'Road Infrastructure',
+            label: t('infrastructure'),
             icon: Construction,
             items: ['Pothole', 'Unrepaired/Damaged Manhole', 'Broken Road Surface']
         },
         {
             id: 'traffic',
-            label: 'Traffic System',
+            label: t('traffic'),
             icon: TrafficEvent,
             items: ['Traffic Signal Issue', 'Traffic Sign Damage', 'Streetlight Not Working', 'Missing Signboard', 'Improper Barricade']
         },
         {
             id: 'env',
-            label: 'Environmental',
+            label: t('environmental'),
             icon: Tree,
             items: ['Tree Obstruction', 'Debris on Road']
         },
         {
             id: 'emergency',
-            label: 'Emergency',
+            label: t('emergency'),
             icon: WarningAlt,
             items: ['Road Accident', 'Vehicle Breakdown']
         },
         {
             id: 'climatic',
-            label: 'Climatic',
+            label: t('climatic'),
             icon: Cloud,
             items: ['Waterlogging', 'Low Visibility']
         }
@@ -564,13 +568,13 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                                      <div className="w-10 h-10 rounded-[1rem] flex items-center justify-center shadow-lg" style={{ background: 'var(--background-image-primary-gradient)' }}>
                                          <span className="material-icons-round text-white text-lg">warning</span>
                                      </div>
-                                     <h2 className="text-2xl font-bold text-white tracking-tight">Report Hazard</h2>
+                                     <h2 className="text-2xl font-bold text-white tracking-tight">{t('reportTitle')}</h2>
                                 </div>
                              </div>
                              
                              <div className="hidden sm:flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-1.5 text-[10px] font-bold text-neutral-300 uppercase tracking-widest backdrop-blur-xl">
                                 <span className={`size-2 rounded-full animate-pulse shadow-sm ${currentUserLocation ? "bg-emerald-400" : "bg-amber-400"}`} />
-                                {currentUserLocation ? "GPS Active" : "Searching Location"}
+                                {currentUserLocation ? t('locationStatus') : t('locationUnknown')}
                              </div>
                         </div>
 
@@ -611,7 +615,7 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                             <div className="group">
                                 <label className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-neutral-500 group-hover:text-primary transition-colors">
                                      <div className="size-1.5 rounded-full bg-primary shadow-sm" />
-                                     Hazard Classification
+                                     {t('selectCategory')}
                                 </label>
                                 
                                 <div className="flex flex-col gap-3">
@@ -705,7 +709,7 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                                 ) : (
                                     <span className="material-icons-round">{isReady ? 'send' : 'lock'}</span>
                                 )}
-                                {isProcessing ? 'AI Processing...' : forceSubmitAllowed ? 'Confirm Manual Submission' : 'Submit Hazard Report'}
+                                {isProcessing ? t('analyzing') : forceSubmitAllowed ? 'Confirm Manual Submission' : t('submit')}
                             </button>
 
                             {/* Progress Indicators */}

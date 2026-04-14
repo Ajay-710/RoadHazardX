@@ -17,6 +17,7 @@ import {
   View,
   Logout
 } from "@carbon/icons-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 /** ======================= Local SVG paths (inline) ======================= */
 const svgPaths = {
@@ -140,6 +141,7 @@ function MenuItem({
 }
 
 const Sidebar = ({ isOpen, toggleSidebar, navigateTo, currentScreen }) => {
+  const { language, setLanguage, t } = useLanguage();
   const [activeRail, setActiveRail] = useState("app");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const user = auth.currentUser;
@@ -165,51 +167,42 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo, currentScreen }) => {
 
   const contentMap = {
     app: {
-      title: "Navigation",
+      title: t('navTitle'),
       sections: [
         {
           title: "Main Views",
           items: [
-            { icon: <View size={16} />, label: "Overview", id: 'hero' },
-            { icon: <Dashboard size={16} />, label: "Home", id: 'home' },
+            { icon: <View size={16} />, label: t('overview'), id: 'hero' },
+            { icon: <Dashboard size={16} />, label: t('home'), id: 'home' },
           ],
         },
         {
           title: "Safety Actions",
           items: [
-            { icon: <Report size={16} />, label: "Report Hazard", id: 'report' },
-            { icon: <Map size={16} />, label: "Smart Map", id: 'map' },
+            { icon: <Report size={16} />, label: t('reportHazard'), id: 'report' },
+            { icon: <Map size={16} />, label: t('smartMap'), id: 'map' },
           ],
         },
       ],
     },
     analytics: {
-      title: "Analytics",
+      title: t('insightsTitle'),
       sections: [
         {
           title: "Data Insights",
           items: [
-            { icon: <Analytics size={16} />, label: "My Dashboard", id: 'dashboard' },
-            { 
-              icon: <Task size={16} />, 
-              label: "Recent Reports", 
-              hasDropdown: true,
-              children: [
-                { label: "Pothole nearby" },
-                { label: "Construction" }
-              ]
-            },
+            { icon: <Analytics size={16} />, label: t('myDashboard'), id: 'dashboard' },
           ],
         },
       ],
     },
     system: {
-      title: "System",
+      title: t('systemTitle'),
       sections: [
         {
           title: "Administration",
           items: [
-            { icon: <Security size={16} />, label: "Admin Panel", id: 'admin' },
+            { icon: <Security size={16} />, label: t('adminPanel'), id: 'admin' },
           ],
         },
       ],
@@ -253,7 +246,23 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo, currentScreen }) => {
 
           <div className="flex-1" />
 
-          <IconNavButton onClick={handleSignOut} label="Log Out">
+          {/* Language Switcher */}
+          <div className="flex flex-col gap-2 mb-2">
+            {['en', 'hi', 'ta'].map((lang) => (
+               <button
+                 key={lang}
+                 onClick={() => setLanguage(lang)}
+                 className={`w-10 h-10 rounded-xl text-[10px] font-black uppercase transition-all duration-300 flex items-center justify-center border
+                    ${language === lang 
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg' 
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-neutral-200'}`}
+               >
+                 {lang}
+               </button>
+            ))}
+          </div>
+
+          <IconNavButton onClick={handleSignOut} label={t('logout')}>
             <Logout size={20} className="text-orange-500" />
           </IconNavButton>
           
@@ -315,8 +324,8 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo, currentScreen }) => {
               <div className="flex items-center gap-3 px-2">
                 <AvatarCircle />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-white truncate">{user?.displayName || 'Active User'}</div>
-                  <div className="text-[10px] text-neutral-500 truncate">{user?.email || 'RoadHazeX Node'}</div>
+                  <div className="text-xs font-bold text-white truncate">{user?.displayName || t('activeUser')}</div>
+                  <div className="text-[10px] text-neutral-500 truncate">{user?.email || t('node')}</div>
                 </div>
               </div>
             </div>

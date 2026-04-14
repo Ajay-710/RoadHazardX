@@ -1,7 +1,20 @@
 import React from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const HomeScreen = ({ isActive, toggleSidebar, navigateTo }) => {
+    const { t } = useLanguage();
     if (!isActive) return null;
+
+    // Split translation for buttons with <br /> if they contain newline
+    const formatBtnLabel = (key) => {
+        const text = t(key);
+        return text.split('\n').map((line, i) => (
+            <React.Fragment key={i}>
+                {line}
+                {i < text.split('\n').length - 1 && <br />}
+            </React.Fragment>
+        ));
+    };
 
     return (
         <section
@@ -25,13 +38,13 @@ const HomeScreen = ({ isActive, toggleSidebar, navigateTo }) => {
                     className="w-56 h-56 rounded-full bg-red-500 shadow-[0_10px_25px_rgba(239,68,68,0.4)] text-white font-bold text-3xl leading-tight flex flex-col items-center justify-center transform transition-transform active:scale-95 hover:scale-105"
                     onClick={() => navigateTo('report')}
                 >
-                    Report<br />Hazard
+                    {formatBtnLabel('reportBtn')}
                 </button>
                 <button
                     className="w-56 h-56 rounded-full bg-green-500 shadow-[0_10px_25px_rgba(34,197,94,0.4)] text-white font-bold text-3xl leading-tight flex flex-col items-center justify-center transform transition-transform active:scale-95 hover:scale-105"
                     onClick={() => navigateTo('map')}
                 >
-                    Smart<br />Map
+                    {formatBtnLabel('mapBtn')}
                 </button>
             </div>
         </section>

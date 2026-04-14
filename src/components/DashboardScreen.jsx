@@ -65,7 +65,7 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
                          {currentUser?.photoURL ? (
                              <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
                          ) : (
-                             <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-blue-500 to-cyan-500">
+                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-500">
                                  <span className="material-icons-round text-white text-[20px]">person</span>
                              </div>
                          )}
@@ -91,7 +91,7 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
 
             {/* AI Insights & Fleet Header */}
             <div className="px-6 mb-6">
-                <div className="glass-panel p-5 rounded-3xl bg-linear-to-br from-white/5 to-white/2">
+                <div className="glass-panel p-5 rounded-3xl bg-gradient-to-br from-white/5 to-white/2">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
                            <span className="material-icons-round text-blue-400 text-sm">analytics</span>
@@ -118,7 +118,7 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
                                     </div>
                                     <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
                                         <div 
-                                            className="h-full bg-linear-to-r from-blue-500 to-cyan-400 transition-all duration-1000 ease-out"
+                                            className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-1000 ease-out"
                                             style={{ width: `${percent}%`, transitionDelay: `${i * 150}ms` }}
                                         />
                                     </div>
@@ -129,85 +129,9 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
                 </div>
             </div>
 
-            {/* Hazards List */}
-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-200 sticky top-0 bg-transparent backdrop-blur-md py-2 z-10">Recent Reports</h3>
-
-                {userHazards.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-                        <span className="material-icons-round text-4xl mb-2">check_circle</span>
-                        <p>No hazards reported yet.</p>
-                    </div>
-                ) : (
-                    userHazards.map((hazard, index) => (
-                        <div key={index} className="glass-panel p-4 rounded-2xl flex items-center gap-4 hover:bg-white/10 transition-colors animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
-                            <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden shrink-0 border border-white/10">
-                                {hazard.image ? (
-                                    <img src={hazard.image} alt={hazard.type} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <span className="material-icons-round text-gray-500">image_not_supported</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                <div className="flex flex-col mb-1">
-                                    <h4 className={`font-bold truncate ${hazard.resolved ? 'text-gray-400 line-through' : 'text-white'}`}>{hazard.type}</h4>
-                                    <div className="mt-1 flex items-center gap-2">
-                                        {hazard.resolved ? (
-                                            <span className="text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded font-bold uppercase border border-green-500/30 flex items-center gap-1 w-fit">
-                                                <span className="material-icons-round text-[10px]">check_circle</span>
-                                                Resolved
-                                            </span>
-                                        ) : (
-                                            <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-bold uppercase border border-red-500/30 w-fit">
-                                                High Priority
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-300 flex items-center gap-1 mt-2">
-                                    <span className="material-icons-round text-[12px]">location_on</span>
-                                    {hazard.lat?.toFixed(4) || 0}, {hazard.lng?.toFixed(4) || 0}
-                                </p>
-                                <p className="text-[10px] text-gray-400 mt-1">
-                                    Sync: Cloud Database
-                                </p>
-                            </div>
-
-                            <div className="flex flex-col items-end gap-2 pr-2">
-                                {!hazard.resolved && hazard.id && (
-                                    <button 
-                                        className="px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/30 text-green-400 text-xs font-bold transition-all border border-green-500/30 shadow-lg"
-                                        onClick={async () => {
-                                            try {
-                                                const docRef = doc(db, 'hazards', hazard.id);
-                                                await updateDoc(docRef, { resolved: true });
-                                            } catch (error) {
-                                                console.error("Failed to mark resolved", error);
-                                                alert("Error updating status via Firebase. Check console.");
-                                            }
-                                        }}
-                                    >
-                                        Mark Fixed
-                                    </button>
-                                )}
-                                <button 
-                                    className="p-2 rounded-full bg-white/5 hover:bg-white/20 text-gray-300 hover:text-white transition-colors flex items-center justify-center w-8 h-8" 
-                                    title="View on Map" 
-                                    onClick={() => navigateTo('map')}
-                                >
-                                    <span className="material-icons-round text-sm">chevron_right</span>
-                                </button>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
 
             {/* Bottom Accent Line */}
-            <div className="h-1.5 w-full bg-linear-to-r from-blue-600 via-cyan-400 to-transparent opacity-50 shrink-0"></div>
+            <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-cyan-400 to-transparent opacity-50 shrink-0"></div>
         </section>
     );
 };

@@ -157,7 +157,11 @@ function Badge({ icon, label }) {
 }
 
 /* ─── Main Login Screen ─── */
+import { useLanguage } from '../contexts/LanguageContext';
+
+/* ─── Main Login Screen ─── */
 const LoginScreen = ({ onBack }) => {
+    const { t } = useLanguage();
     const handleGoogleLogin = async () => {
         const provider = new GoogleAuthProvider();
         try {
@@ -199,24 +203,24 @@ const LoginScreen = ({ onBack }) => {
                 <div className="relative z-10 flex flex-col flex-1 justify-center px-10 pb-16">
                     <div className="mb-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full w-fit" style={{ background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)' }}>
                         <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#FF6B6B' }}></span>
-                        <span className="text-xs font-semibold text-[#FF6B6B] uppercase tracking-widest">Live Telemetry Node</span>
+                        <span className="text-xs font-semibold text-[#FF6B6B] uppercase tracking-widest">{t('telemetryNode')}</span>
                     </div>
 
                     <h2 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tighter">
-                        IDENTIFY YOUR<br />
+                        {t('identifyRank')}<br />
                         <span style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                            MUNICIPAL RANK.
+                            {t('municipalRank')}
                         </span>
                     </h2>
                     <p className="text-white/40 text-base max-w-sm leading-relaxed mb-10 font-medium">
-                        Securely connect to the RoadHazardX network to manage road integrity, report hazards, and monitor AI-driven detections.
+                        {t('loginDesc')}
                     </p>
 
                     {/* Badges */}
                     <div className="flex flex-wrap gap-2 mb-10">
-                        <Badge icon="map" label="Smart Maps" />
-                        <Badge icon="analytics" label="AI Insight" />
-                        <Badge icon="security" label="Encrypted" />
+                        <Badge icon="map" label={t('mapBtn')} />
+                        <Badge icon="analytics" label={t('aiInsight')} />
+                        <Badge icon="security" label={t('encrypted')} />
                     </div>
                 </div>
 
@@ -236,8 +240,8 @@ const LoginScreen = ({ onBack }) => {
                         <span className="material-icons-round text-blue-500 text-5xl group-hover:scale-110 transition-transform">fingerprint</span>
                         <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
                     </div>
-                    <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Access Node</h1>
-                    <p className="text-sm text-white/30 font-bold uppercase tracking-[0.2em] mt-2">Municipal Authentication</p>
+                    <h1 className="text-3xl font-black text-white mb-2 tracking-tight">{t('accessNode')}</h1>
+                    <p className="text-sm text-white/30 font-bold uppercase tracking-[0.2em] mt-2">{t('muniAuth')}</p>
                 </div>
 
                 {/* Firebase Auth */}
@@ -252,12 +256,12 @@ const LoginScreen = ({ onBack }) => {
                             <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
                             <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
                         </svg>
-                        <span className="text-white font-black text-sm tracking-wide">Login with Google</span>
+                        <span className="text-white font-black text-sm tracking-wide">{t('loginGoogle')}</span>
                     </button>
                     
                     <div className="flex items-center gap-4 px-6 opacity-20">
                         <div className="flex-1 h-px bg-white"></div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Encrypted</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">{t('encrypted')}</span>
                         <div className="flex-1 h-px bg-white"></div>
                     </div>
 

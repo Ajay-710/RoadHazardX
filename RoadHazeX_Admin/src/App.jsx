@@ -118,7 +118,7 @@ function App() {
                       </div>
                       <h1 className="text-6xl md:text-8xl font-black text-white leading-[0.9] tracking-tighter">
                          COMMAND<br/>
-                         <span className="text-linear-to-r from-blue-400 to-cyan-400">CENTER</span>
+                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">CENTER</span>
                       </h1>
                       <p className="text-xl text-slate-500 font-medium max-w-md leading-relaxed">
                          Access the RoadHazardX municipal infrastructure. Resolve incidents and monitor regional telemetry.
@@ -165,9 +165,7 @@ function App() {
   return (
     <div className="w-full h-screen bg-[#020617] overflow-hidden">
         {isAuthorized ? (
-          <div className="w-full h-full flex flex-col relative animate-fade-in">
-               <AdminDashboard hazards={hazards} userRole={userRole} />
-               {/* Fixed Sign Out Control */}
+          <div className="w-full h-full flex flex-col relative animate-fade-in min-h-0">
                <div className="fixed top-6 right-8 z-[100] group flex items-center gap-3 bg-slate-900/40 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/5 shadow-3xl">
                    <div className="flex flex-col items-end mr-3">
                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Official Account</span>
@@ -182,6 +180,7 @@ function App() {
                         <span className="material-icons-round text-xl">power_settings_new</span>
                    </button>
                </div>
+               <AdminDashboard hazards={hazards} userRole={userRole} />
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">

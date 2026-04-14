@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Globe } from './ui/Globe';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -6,6 +7,7 @@ import polyline from '@mapbox/polyline';
 import * as turf from '@turf/turf';
 
 const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRouteRequest, navigateTo }) => {
+    const { t } = useLanguage();
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const userMarkerRef = useRef(null);
@@ -1992,7 +1994,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                         });
                                         setClickedLocation(null);
                                     }}
-                                    className="flex-1 bg-linear-to-r from-blue-600 to-indigo-600 text-white font-black text-[13px] py-3.5 rounded-2xl shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-[13px] py-3.5 rounded-2xl shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2"
                                 >
                                     <span className="material-icons-round text-sm">navigation</span>
                                     GO HERE
@@ -2005,7 +2007,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                     <span className={`material-icons-round text-[18px] ${isFetchingStreetView ? 'animate-spin' : ''}`}>
                                         {isFetchingStreetView ? 'sync' : 'streetview'}
                                     </span>
-                                    {isFetchingStreetView ? 'Finding...' : 'Look Around'}
+                                    {isFetchingStreetView ? t('finding') : t('lookAround')}
                                 </button>
                             </div>
                         </div>
@@ -2145,19 +2147,19 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                     {navPhase === 3 && routeStats && (
                         <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/50 flex justify-around items-center animate-slide-up">
                             <div className="text-center">
-                                <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Distance</div>
+                                <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{t('distance')}</div>
                                 <div className="text-xl font-bold text-blue-600">{routeStats.distance}</div>
                             </div>
                             <div className="w-px h-8 bg-gray-200" />
                             <div className="text-center">
-                                <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Duration</div>
+                                <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{t('duration')}</div>
                                 <div className="text-xl font-bold text-gray-800">{routeStats.duration}</div>
                             </div>
                             {routeElevationProfile && (
                                 <>
                                     <div className="w-px h-8 bg-gray-200" />
                                     <div className="text-center">
-                                        <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Climb</div>
+                                        <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{t('climb')}</div>
                                         <div className="text-[14px] font-black text-emerald-600">+{Math.round(routeElevationProfile.totalAscent)}m</div>
                                     </div>
                                 </>
@@ -2170,7 +2172,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                         <div className="w-9 h-9 border-4 border-red-500 rounded-full flex items-center justify-center bg-white shadow-lg">
                                             <span className="text-[14px] font-black text-gray-900">{currentSpeedLimit}</span>
                                         </div>
-                                        <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Limit</span>
+                                        <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">{t('limit')}</span>
                                     </div>
                                 </>
                             )}
@@ -2192,7 +2194,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                         e.target.src = `https://api.olamaps.io/tiles/v1/styles/${cleanStyle}/static/${selectedDestination.lng},${selectedDestination.lat},15/800x320.png?api_key=${OLA_MAPS_API_KEY}`;
                                     }}
                                 />
-                                <div className="absolute inset-0 bg-linear-to-t from-blue-500/20 to-transparent pointer-events-none"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-500/20 to-transparent pointer-events-none"></div>
                                 <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-white/80 backdrop-blur-md rounded-md text-[8px] font-black text-blue-600 uppercase tracking-widest border border-blue-100 shadow-sm flex items-center gap-1">
                                     <span className="material-icons-round text-[10px]">insights</span>
                                     Journey Comparison
@@ -2425,7 +2427,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
 
                     {navPhase < 3 ? (
                         <button
-                            className={`w-full p-[18px] rounded-2xl font-bold flex items-center justify-center gap-3 text-[17px] shadow-xl outline-none transition-all active:scale-[0.98] ${navPhase >= 1 ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white hover:shadow-2xl hover:brightness-110' : 'bg-white/80 text-gray-400 shadow-md cursor-not-allowed'}`}
+                            className={`w-full p-[18px] rounded-2xl font-bold flex items-center justify-center gap-3 text-[17px] shadow-xl outline-none transition-all active:scale-[0.98] ${navPhase >= 1 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-2xl hover:brightness-110' : 'bg-white/80 text-gray-400 shadow-md cursor-not-allowed'}`}
                             onClick={() => {
                                 if (navPhase === 1) calculateRoutes();
                                 else if (navPhase >= 2) startNavigation();
@@ -2434,7 +2436,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                             <span className="material-icons-round text-[24px]">
                                 {navPhase === 1 ? 'route' : 'explore'}
                             </span>
-                            {navPhase === 0 ? 'Choose route above' : (navPhase === 1 ? 'Get Directions' : 'Start Navigating')}
+                            {navPhase === 0 ? t('chooseAbove') : (navPhase === 1 ? t('getDirections') : t('startNavigating'))}
                         </button>
                     ) : (
                         <button
@@ -2442,7 +2444,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                             onClick={endNavigation}
                         >
                             <span className="material-icons-round text-[22px]">close</span>
-                            End Navigation
+                            {t('endNavigation')}
                         </button>
                     )}
                 </div>
@@ -2466,7 +2468,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                                     className="w-full h-full object-cover animate-pan-image" 
                                     alt="Street View" 
                                 />
-                                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-black/20 pointer-events-none"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none"></div>
                                 
                                 {/* Bearing Indicator */}
                                 <div className="absolute bottom-6 left-6 flex items-center gap-3">

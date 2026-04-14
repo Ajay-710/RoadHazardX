@@ -49,7 +49,14 @@ function App() {
             setIsAuthLoaded(true);
         });
         return () => unsubscribe();
-    }, [currentScreen]);
+    }, []);
+
+    // Auto-redirect logged-in users from Hero
+    useEffect(() => {
+        if (user && currentScreen === 'hero') {
+            navigateTo('home');
+        }
+    }, [user, currentScreen]);
 
     const [hazards, setHazards] = useState([]);
 

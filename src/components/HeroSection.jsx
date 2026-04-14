@@ -1,4 +1,3 @@
-// HeroSection.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
@@ -7,10 +6,11 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
 import './HeroSection.css';
-
+import { useLanguage } from '../contexts/LanguageContext';
 gsap.registerPlugin(ScrollTrigger);
 
 const HeroSection = ({ onGetStarted, onMenuClick, isSidebarOpen }) => {
+  const { t } = useLanguage();
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const titleRef = useRef(null);
@@ -452,16 +452,16 @@ const HeroSection = ({ onGetStarted, onMenuClick, isSidebarOpen }) => {
 
       {/* Main content - Fixed in center */}
       <div className="hero-content cosmos-content" style={{ opacity: currentSection === 0 ? 1 : 0, transition: 'opacity 0.8s ease-in-out' }}>
-        <h1 className="hero-title">{splitTitle('ROADHAZEX')}</h1>
+        <h1 className="hero-title">{splitTitle(t('heroTitle'))}</h1>
         <div className="hero-subtitle cosmos-subtitle">
-          <p className="subtitle-line">Predicting the Path. Preserving the Road.</p>
-          <p className="subtitle-line">Powering the Future of Safe Transit</p>
+          <p className="subtitle-line">{t('heroSubtitle1')}</p>
+          <p className="subtitle-line">{t('heroSubtitle2')}</p>
           <button 
             className="mt-12 px-10 py-4 bg-white text-black font-extrabold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-2xl pointer-events-auto cursor-pointer"
             onClick={onGetStarted}
             style={{ pointerEvents: 'auto', zIndex: 50 }}
           >
-            GET STARTED
+            {t('heroGetStarted')}
           </button>
         </div>
       </div>
@@ -481,10 +481,10 @@ const HeroSection = ({ onGetStarted, onMenuClick, isSidebarOpen }) => {
       <div className="scroll-sections">
        {[...Array(totalSections + 1)].map((_, i) => {
           if (i === 0) return <section key={i} className="content-section h-screen" />; // Main is already handled
-          const titles = { 1: 'AI-DRIVEN', 2: 'SAFE ROADS' };
+          const titles = { 1: t('heroAIDriven'), 2: t('heroSafeRoads') };
           const subtitles = {
-            1: { line1: 'Real-time Infrastructure Monitoring.', line2: 'Identifying Municipal Risks with AI Precision' },
-            2: { line1: 'Bridging the Gap Between Risk and Response.', line2: 'Engineering a World Without Road Hazards' }
+            1: { line1: t('heroMonitoring'), line2: t('heroRisks') },
+            2: { line1: t('heroBridging'), line2: t('heroEngineering') }
           };
           
           return (
@@ -498,7 +498,7 @@ const HeroSection = ({ onGetStarted, onMenuClick, isSidebarOpen }) => {
                     className="mt-12 px-10 py-4 bg-white text-black font-extrabold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-2xl pointer-events-auto cursor-pointer"
                     onClick={onGetStarted}
                   >
-                    ENTER HUB
+                    {t('heroEnterHub')}
                   </button>
                 </div>
               </div>

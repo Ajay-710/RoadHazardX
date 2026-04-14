@@ -7,9 +7,12 @@ import { doc, updateDoc } from 'firebase/firestore';
 
 const STATUS_THEMES = {
     "Pending": { color: "#ef4444", bg: "bg-red-500/10", border: "border-red-500/20", text: "text-red-400", pill: "bg-red-500", glow: "shadow-[0_0_20px_rgba(239,68,68,0.4)]" },
+    "Verified": { color: "#3b82f6", bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-400", pill: "bg-blue-500", glow: "shadow-[0_0_20px_rgba(59,130,246,0.4)]" },
     "In Progress": { color: "#f59e0b", bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-400", pill: "bg-amber-500", glow: "shadow-[0_0_20px_rgba(245,158,11,0.4)]" },
     "Resolved": { color: "#10b981", bg: "bg-emerald-500/10", border: "border-emerald-500/20", text: "text-emerald-400", pill: "bg-emerald-500", glow: "shadow-[0_0_20px_rgba(16,185,129,0.4)]" }
 };
+
+const getTheme = (status) => STATUS_THEMES[status] || STATUS_THEMES["Pending"];
 
 const AdminDashboard = ({ hazards, userRole }) => {
     const mapContainerRef = useRef(null);
@@ -75,7 +78,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
             const hLat = Number(hazard.lat);
             if (isNaN(hLng) || isNaN(hLat)) return;
 
-            const theme = STATUS_THEMES[hazard.status || 'Pending'];
+            const theme = getTheme(hazard.status);
             const el = document.createElement('div');
             el.className = `w-8 h-8 rounded-full flex items-center justify-center cursor-pointer border-2 shadow-lg transition-transform hover:scale-125 hover:z-50 ${theme.pill}`;
             
@@ -111,11 +114,11 @@ const AdminDashboard = ({ hazards, userRole }) => {
     };
 
     return (
-        <div className="flex-1 flex flex-col bg-[#020617] relative">
+        <div className="flex-1 flex flex-col bg-[#020617] relative min-h-0">
             {/* Command Header */}
             <header className="h-20 shrink-0 bg-slate-950/80 backdrop-blur-3xl border-b border-white/5 flex items-center justify-between px-8 z-30">
                 <div className="flex items-center gap-6">
-                    <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-2xl shadow-blue-500/20">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-2xl shadow-blue-500/20">
                         <span className="material-icons-round text-white text-2xl">monitoring</span>
                     </div>
                     <div>
@@ -141,9 +144,9 @@ const AdminDashboard = ({ hazards, userRole }) => {
             </header>
 
             {/* Main Area */}
-            <div className="flex-1 flex overflow-hidden relative">
+            <div className="flex-1 flex overflow-hidden relative min-h-0">
                 {/* Left Panel: Analytics & List */}
-                <aside className="w-[420px] h-full shrink-0 border-r border-white/5 bg-slate-950/50 flex flex-col z-20">
+                <aside className="w-[420px] h-full shrink-0 border-r border-white/5 bg-slate-950/50 flex flex-col z-20 min-h-0">
                     {/* Search & Stats */}
                     <div className="p-6 shrink-0 space-y-6 bg-slate-900/40 border-b border-white/5">
                         <div className="relative group">
@@ -169,7 +172,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                         </div>
 
                         <div className="flex gap-2 overflow-x-auto pb-1 py-1 custom-scrollbar">
-                            {['All', 'Pending', 'In Progress', 'Resolved'].map(stat => (
+                            {['All', 'Pending', 'Verified', 'In Progress', 'Resolved'].map(stat => (
                                 <button 
                                     key={stat}
                                     onClick={() => setFilterStatus(stat)}
@@ -185,9 +188,9 @@ const AdminDashboard = ({ hazards, userRole }) => {
                     </div>
 
                     {/* Infinite Hazard List */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 pr-2 custom-scrollbar">
-                        {filteredHazards.map((hazard) => {
-                             const theme = STATUS_THEMES[hazard.status || 'Pending'];
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 pr-2 custom-scrollbar overscroll-contain">
+                         {filteredHazards.map((hazard) => {
+                             const theme = getTheme(hazard.status);
                              return (
                                 <div 
                                     key={hazard.id}
@@ -246,15 +249,15 @@ const AdminDashboard = ({ hazards, userRole }) => {
                     <div ref={mapContainerRef} className="absolute inset-0" />
                     
                     {/* Gradient Overlays for Cinematic Feel */}
-                    <div className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-slate-950 to-transparent pointer-events-none"></div>
-                    <div className="absolute inset-y-0 left-0 w-20 bg-linear-to-r from-slate-950 to-transparent pointer-events-none"></div>
+                    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none"></div>
+                    <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-slate-950 to-transparent pointer-events-none"></div>
 
                     {/* Legend */}
                     <div className="absolute bottom-10 left-10 z-10 flex gap-4">
                          <div className="glass-panel p-4 rounded-3xl shadow-2xl flex items-center gap-8 px-8">
-                             {['Pending', 'In Progress', 'Resolved'].map(s => (
+                             {['Pending', 'Verified', 'In Progress', 'Resolved'].map(s => (
                                  <div key={s} className="flex items-center gap-3">
-                                     <span className={`w-3 h-3 rounded-full ${STATUS_THEMES[s].pill} shadow-lg shadow-black/50`}></span>
+                                     <span className={`w-3 h-3 rounded-full ${getTheme(s).pill} shadow-lg shadow-black/50`}></span>
                                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">{s}</span>
                                  </div>
                              ))}
@@ -266,7 +269,7 @@ const AdminDashboard = ({ hazards, userRole }) => {
                         <div className="absolute top-10 right-10 w-[440px] max-h-[calc(100%-5rem)] bg-slate-950/90 backdrop-blur-3xl rounded-[48px] shadow-[0_40px_120px_rgba(0,0,0,0.6)] border border-white/10 overflow-hidden flex flex-col z-30 animate-slide-in-right">
                              <div className="relative h-72 shrink-0 overflow-hidden">
                                  <img src={selectedHazard.image} className="w-full h-full object-cover brightness-[0.7]" alt="Evidence" />
-                                 <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
+                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
                                  
                                  <button 
                                     onClick={() => setSelectedHazard(null)}
@@ -276,14 +279,14 @@ const AdminDashboard = ({ hazards, userRole }) => {
                                  </button>
 
                                  <div className="absolute bottom-10 left-10 right-10">
-                                     <div className={`px-3 py-1 rounded w-fit text-[10px] font-black text-white uppercase mb-4 tracking-widest ${STATUS_THEMES[selectedHazard.status || 'Pending'].pill}`}>
+                                     <div className={`px-3 py-1 rounded w-fit text-[10px] font-black text-white uppercase mb-4 tracking-widest ${getTheme(selectedHazard.status).pill}`}>
                                          {selectedHazard.status || 'Pending'}
                                      </div>
                                      <h2 className="text-3xl font-black text-white leading-tight uppercase tracking-tighter pr-4">{selectedHazard.type}</h2>
                                  </div>
                              </div>
 
-                             <div className="p-10 flex-1 overflow-y-auto min-h-0 space-y-10 custom-scrollbar pr-6">
+                             <div className="p-10 flex-1 overflow-y-auto min-h-0 space-y-10 custom-scrollbar pr-6 overscroll-contain">
                                  <div className="grid grid-cols-2 gap-6">
                                      <div className="bg-white/5 p-6 rounded-[36px] border border-white/5 text-center transition-transform hover:scale-[1.02]">
                                          <div className="text-5xl font-black text-white tracking-tighter leading-none">{selectedHazard.reportCount || 1}</div>
