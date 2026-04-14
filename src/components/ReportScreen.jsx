@@ -550,7 +550,12 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                 
                 <div className="fixed top-0 left-0 right-0 h-[3px] z-[100] animate-gradient" style={{ background: 'var(--background-image-primary-gradient)' }} />
 
-                <div className="w-full max-w-6xl rounded-[2.5rem] border border-white/10 bg-white/5 backdrop-blur-3xl overflow-hidden relative shadow-2xl flex flex-col lg:flex-row max-h-[95vh] lg:h-[800px]">
+                <div className="w-full max-w-2xl rounded-[2.5rem] border border-white/10 bg-white/5 backdrop-blur-3xl overflow-hidden relative shadow-2xl flex flex-col max-h-[95vh]">
+                    
+                    {/* Background Globe - Absolute */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none scale-150 rotate-12">
+                         <Globe size={1000} />
+                    </div>
                     
                     <div className="absolute top-0 right-1/4 w-96 h-96 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
@@ -723,16 +728,6 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                                 </span>
                             </div>
                         </div>
-                    </div>
-
-                    <div className="flex-1 hidden lg:flex items-center justify-center p-8 bg-black/20 border-l border-white/5 relative">
-                         <div className="absolute top-10 left-10 py-1.5 px-4 bg-white/5 border border-white/10 rounded-full flex items-center gap-2 backdrop-blur-md">
-                            <span className="size-1.5 rounded-full bg-blue-400 animate-pulse" />
-                            <span className="text-[10px] font-bold text-blue-300 tracking-widest uppercase">Global Edge Node</span>
-                         </div>
-                         <div className="w-full h-full flex items-center justify-center transition-transform hover:scale-[1.02]">
-                            <Globe size={460} />
-                         </div>
                     </div>
                 </div>
             </section>
