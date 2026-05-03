@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '../firebase';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { Capacitor } from '@capacitor/core';
 
 /* ─── Animated canvas: road & particle effect ─── */
 function RoadCanvas() {
@@ -163,13 +165,53 @@ import { useLanguage } from '../contexts/LanguageContext';
 const LoginScreen = ({ onBack }) => {
     const { t } = useLanguage();
     const handleGoogleLogin = async () => {
-        const provider = new GoogleAuthProvider();
-        try {
-            await signInWithPopup(auth, provider);
-            console.log("🔥 Firebase Google Login Successful");
-        } catch (err) {
-            console.error("Firebase Login Error:", err);
-            alert("Login failed: " + err.message);
+        console.log("🛠️ Platform Detection:", Capacitor.getPlatform(), "isNative:", Capacitor.isNativePlatform());
+        if (Capacitor.isNativePlatform()) {
+            try {
+                // Explicitly passing the googleId (Web Client ID) directly in the call
+                const result = await FirebaseAuthentication.signInWithGoogle();
+                
+                // If the above still says "No credentials", try the one-tap style or ensure it's configured
+                console.log("🔥 Native Login Result:", JSON.stringify(result));
+                
+                // Get the ID Token from the result (could be result.idToken or result.credential.idToken)
+                const idToken = result.credential?.idToken || result.idToken;
+                
+                if (idToken) {
+                    const credential = GoogleAuthProvider.credential(idToken);
+                    await signInWithCredential(auth, credential);
+                    console.log("🔥 Native Google Login Successful via Credential");
+                } else if (result.user) {
+                    console.log("🔥 Native Google Login Successful (User already linked)");
+                }
+            } catch (err) {
+                console.error("Native Login Error:", err);
+                // If it's the specific "No credentials" error, it means no Google account on device
+                if (err.message && err.message.includes("No credentials available")) {
+                    alert("Native Login failed: No Google Account found on this device. Please sign into the Play Store first.");
+                } else {
+                    alert("Native Login Error: " + (err.message || JSON.stringify(err)));
+                }
+                
+                console.log("🔄 Falling back to Web Login...");
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                    console.log("🔥 Fallback Web Login Successful");
+                } catch (webErr) {
+                    console.error("Fallback Web Login Error:", webErr);
+                    alert("Web Login failed: " + webErr.message);
+                }
+            }
+        } else {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                console.log("🔥 Firebase Web Google Login Successful");
+            } catch (err) {
+                console.error("Firebase Web Login Error:", err);
+                alert("Web Login failed: " + err.message);
+            }
         }
     };
 

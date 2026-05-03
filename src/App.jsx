@@ -53,7 +53,7 @@ function App() {
 
     // Auto-redirect logged-in users from Hero
     useEffect(() => {
-        if (user && currentScreen === 'hero') {
+        if (user && (currentScreen === 'hero' || currentScreen === 'login')) {
             navigateTo('home');
         }
     }, [user, currentScreen]);
@@ -147,7 +147,8 @@ function App() {
             );
         }
 
-        if (!user || currentScreen === 'login') {
+        // If not logged in, show login (unless we are on hero which has its own login button)
+        if (!user) {
             return <LoginScreen onBack={() => navigateTo('hero')} />;
         }
 

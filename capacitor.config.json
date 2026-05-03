@@ -1,0 +1,16 @@
+{
+  "appId": "com.ajay.roadhazex",
+  "appName": "RoadHazeX",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"],
+      "googleId": "789679064279-odp0tmljpnrprboq5es6upvfkgh0d14n.apps.googleusercontent.com"
+    }
+  }
+}
