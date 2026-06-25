@@ -800,32 +800,32 @@ const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) =
                                     e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                                 }}
                             >
-                                <option value="" disabled style={{ background: '#1e2d4a', color: '#888' }}>Select Hazard Type</option>
-                                <option value="" disabled style={{ background: '#1e2d4a', color: '#888' }}>--- ROAD HAZARDS CATEGORY ≡ƒÜª ---</option>
-                                <optgroup label="1∩╕ÅΓâú Road Infrastructure Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Potholes" style={{ background: '#1e2d4a' }}>Potholes</option>
-                                    <option value="Road cracks" style={{ background: '#1e2d4a' }}>Road cracks</option>
-                                    <option value="Uneven roads" style={{ background: '#1e2d4a' }}>Uneven roads</option>
-                                    <option value="Damaged manholes" style={{ background: '#1e2d4a' }}>Damaged manholes</option>
+                                <option value="" disabled style={{ background: '#0a0a0a', color: '#888' }}>Select Hazard Type</option>
+                                <option value="" disabled style={{ background: '#0a0a0a', color: '#888' }}>--- ROAD HAZARDS CATEGORY ---</option>
+                                <optgroup label="1. Road Infrastructure Hazards" style={{ background: '#0a0a0a' }}>
+                                    <option value="Potholes" style={{ background: '#0a0a0a' }}>Potholes</option>
+                                    <option value="Road cracks" style={{ background: '#0a0a0a' }}>Road cracks</option>
+                                    <option value="Uneven roads" style={{ background: '#0a0a0a' }}>Uneven roads</option>
+                                    <option value="Damaged manholes" style={{ background: '#0a0a0a' }}>Damaged manholes</option>
                                 </optgroup>
-                                <optgroup label="2∩╕ÅΓâú Traffic System Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Non-functioning traffic signals" style={{ background: '#1e2d4a' }}>Non-functioning traffic signals</option>
-                                    <option value="Broken or bent traffic signs" style={{ background: '#1e2d4a' }}>Broken or bent traffic signs</option>
-                                    <option value="Non-working street lights" style={{ background: '#1e2d4a' }}>Non-working street lights</option>
-                                    <option value="Missing signboards" style={{ background: '#1e2d4a' }}>Missing signboards</option>
-                                    <option value="Improperly placed barricades" style={{ background: '#1e2d4a' }}>Improperly placed barricades</option>
+                                <optgroup label="2. Traffic System Hazards" style={{ background: '#0a0a0a' }}>
+                                    <option value="Non-functioning traffic signals" style={{ background: '#0a0a0a' }}>Non-functioning traffic signals</option>
+                                    <option value="Broken or bent traffic signs" style={{ background: '#0a0a0a' }}>Broken or bent traffic signs</option>
+                                    <option value="Non-working street lights" style={{ background: '#0a0a0a' }}>Non-working street lights</option>
+                                    <option value="Missing signboards" style={{ background: '#0a0a0a' }}>Missing signboards</option>
+                                    <option value="Improperly placed barricades" style={{ background: '#0a0a0a' }}>Improperly placed barricades</option>
                                 </optgroup>
-                                <optgroup label="3∩╕ÅΓâú Environmental Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Fallen trees" style={{ background: '#1e2d4a' }}>Fallen trees</option>
-                                    <option value="Debris on road" style={{ background: '#1e2d4a' }}>Debris on road</option>
+                                <optgroup label="3. Environmental Hazards" style={{ background: '#0a0a0a' }}>
+                                    <option value="Fallen trees" style={{ background: '#0a0a0a' }}>Fallen trees</option>
+                                    <option value="Debris on road" style={{ background: '#0a0a0a' }}>Debris on road</option>
                                 </optgroup>
-                                <optgroup label="4∩╕ÅΓâú Emergency Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Road accidents" style={{ background: '#1e2d4a' }}>Road accidents</option>
-                                    <option value="Vehicle breakdown" style={{ background: '#1e2d4a' }}>Vehicle breakdown</option>
+                                <optgroup label="4. Emergency Hazards" style={{ background: '#0a0a0a' }}>
+                                    <option value="Road accidents" style={{ background: '#0a0a0a' }}>Road accidents</option>
+                                    <option value="Vehicle breakdown" style={{ background: '#0a0a0a' }}>Vehicle breakdown</option>
                                 </optgroup>
-                                <optgroup label="5∩╕ÅΓâú Climatic Hazards" style={{ background: '#1e2d4a' }}>
-                                    <option value="Waterlogging / flooded roads" style={{ background: '#1e2d4a' }}>Waterlogging / flooded roads</option>
-                                    <option value="Low visibility zones" style={{ background: '#1e2d4a' }}>Low visibility zones (due to Fog, Mist, etc.)</option>
+                                <optgroup label="5. Climatic Hazards" style={{ background: '#0a0a0a' }}>
+                                    <option value="Waterlogging / flooded roads" style={{ background: '#0a0a0a' }}>Waterlogging / flooded roads</option>
+                                    <option value="Low visibility zones" style={{ background: '#0a0a0a' }}>Low visibility zones (due to Fog, Mist, etc.)</option>
                                 </optgroup>
                             </select>
                             {/* Custom chevron */}
