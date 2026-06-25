@@ -2017,13 +2017,6 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
                 {/* Floating Map Controls */}
                 <div className="absolute right-4 top-44 flex flex-col gap-3 z-1000">
                     <button 
-                        className="bg-white text-gray-800 rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:bg-gray-100 transition-all active:scale-90"
-                        onClick={() => navigateTo('dashboard')}
-                        title="Open Dashboard"
-                    >
-                        <span className="material-icons-round text-2xl">grid_view</span>
-                    </button>
-                    <button 
                         className={`bg-white text-gray-800 rounded-full w-12 h-12 flex items-center justify-center shadow-lg transition-all ${is3D ? 'bg-blue-600 text-white shadow-blue-200' : ''}`}
                         onClick={toggle3D}
                     >

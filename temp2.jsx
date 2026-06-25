@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-/* ΓöÇΓöÇΓöÇ Animated background canvas ΓöÇΓöÇΓöÇ */
+/* ─── Animated background canvas ─── */
 function RoadBg() {
     const canvasRef = useRef(null);
 
@@ -22,7 +22,7 @@ function RoadBg() {
         resize();
         window.addEventListener('resize', resize);
 
-        // Mouse move ΓåÆ spawn ripple
+        // Mouse move → spawn ripple
         const onMouseMove = (e) => {
             const rect = canvas.getBoundingClientRect();
             mouse.x = e.clientX - rect.left;
@@ -49,15 +49,15 @@ function RoadBg() {
         const draw = () => {
             ctx.clearRect(0, 0, W, H);
 
-            /* ΓöÇΓöÇ Background gradient ΓöÇΓöÇ */
+            /* ── Background gradient ── */
             const bg = ctx.createLinearGradient(0, 0, 0, H);
-            bg.addColorStop(0, '#050505');
-            bg.addColorStop(0.45, '#1a1a1a');
-            bg.addColorStop(1, '#000000');
+            bg.addColorStop(0, '#0d1b3e');
+            bg.addColorStop(0.45, '#1e3c72');
+            bg.addColorStop(1, '#0a0f2c');
             ctx.fillStyle = bg;
             ctx.fillRect(0, 0, W, H);
 
-            /* ΓöÇΓöÇ Road (perspective trapezoid) ΓöÇΓöÇ */
+            /* ── Road (perspective trapezoid) ── */
             const roadW = W * 0.58;
             const vanishX = W / 2;
             const vanishY = H * 0.36;
@@ -65,9 +65,9 @@ function RoadBg() {
             const rightBottom = W / 2 + roadW / 2;
 
             const roadGrad = ctx.createLinearGradient(vanishX, vanishY, vanishX, H);
-            roadGrad.addColorStop(0, 'rgba(40,40,40,0)');
-            roadGrad.addColorStop(0.3, 'rgba(30,30,30,0.5)');
-            roadGrad.addColorStop(1, 'rgba(15,15,15,0.85)');
+            roadGrad.addColorStop(0, 'rgba(40,60,110,0)');
+            roadGrad.addColorStop(0.3, 'rgba(20,38,80,0.5)');
+            roadGrad.addColorStop(1, 'rgba(12,22,60,0.85)');
 
             ctx.beginPath();
             ctx.moveTo(vanishX, vanishY);
@@ -77,13 +77,13 @@ function RoadBg() {
             ctx.fillStyle = roadGrad;
             ctx.fill();
 
-            /* ΓöÇΓöÇ Edge lines ΓöÇΓöÇ */
+            /* ── Edge lines ── */
             ctx.strokeStyle = 'rgba(255,255,255,0.10)';
             ctx.lineWidth = 1.5;
             ctx.beginPath(); ctx.moveTo(vanishX - 4, vanishY); ctx.lineTo(leftBottom, H); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(vanishX + 4, vanishY); ctx.lineTo(rightBottom, H); ctx.stroke();
 
-            /* ΓöÇΓöÇ Moving dashed centre line ΓöÇΓöÇ */
+            /* ── Moving dashed centre line ── */
             const dashCount = 14;
             ctx.setLineDash([16, 16]);
             ctx.lineDashOffset = -offset;
@@ -98,7 +98,7 @@ function RoadBg() {
             }
             ctx.setLineDash([]);
 
-            /* ΓöÇΓöÇ Horizon glow ΓöÇΓöÇ */
+            /* ── Horizon glow ── */
             const glowGrad = ctx.createRadialGradient(vanishX, vanishY, 0, vanishX, vanishY, H * 0.5);
             glowGrad.addColorStop(0, 'rgba(255,107,107,0.14)');
             glowGrad.addColorStop(0.5, 'rgba(255,142,83,0.06)');
@@ -106,7 +106,7 @@ function RoadBg() {
             ctx.fillStyle = glowGrad;
             ctx.fillRect(0, 0, W, H);
 
-            /* ΓöÇΓöÇ Mouse proximity glow ΓöÇΓöÇ */
+            /* ── Mouse proximity glow ── */
             if (mouse.x > 0) {
                 const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 120);
                 mg.addColorStop(0, 'rgba(255,107,107,0.10)');
@@ -115,7 +115,7 @@ function RoadBg() {
                 ctx.fillRect(0, 0, W, H);
             }
 
-            /* ΓöÇΓöÇ Ripples ΓöÇΓöÇ */
+            /* ── Ripples ── */
             for (let i = ripples.length - 1; i >= 0; i--) {
                 const rp = ripples[i];
                 ctx.beginPath();
@@ -128,7 +128,7 @@ function RoadBg() {
                 if (rp.alpha <= 0) ripples.splice(i, 1);
             }
 
-            /* ΓöÇΓöÇ Floating particles ΓöÇΓöÇ */
+            /* ── Floating particles ── */
             particles.forEach(p => {
                 // resize-safe: reset to canvas dims lazily
                 if (p.x > W) p.x = Math.random() * W;
@@ -183,7 +183,7 @@ const LOCAL_API_URL = "http://127.0.0.1:5000/predict";
 const HF_SPACE_URL = "https://vijaydevaraj-vlm-clip-model.hf.space/predict"; 
 // ---------------------
 
-const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation, onSubmit }) => {
+const ReportScreen = ({ isActive, navigateTo, currentUserLocation, onSubmit }) => {
     const [cameraActive, setCameraActive] = useState(false);
     const [photoPreview, setPhotoPreview] = useState(null);
     const [hazardType, setHazardType] = useState('');
@@ -192,11 +192,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
     const [forceSubmitAllowed, setForceSubmitAllowed] = useState(false);
     const [cameraHovered, setCameraHovered] = useState(false);
     const [submitHovered, setSubmitHovered] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    
-    // --- New: Submission Preview State ---
-    const [previewData, setPreviewData] = useState(null);
-    const [editableLandmark, setEditableLandmark] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -318,8 +314,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                 pd.img || photoPreview, 
                 pd.conf || 0.0, 
                 pd.status || 'Mismatch', 
-                pd.addr || 'Manual Report',
-                pd.jurisdiction || { Authority: 'Unknown Jurisdiction' }
+                pd.addr || 'Manual Report'
             );
             return;
         }
@@ -333,10 +328,6 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
             const formData = new FormData();
             formData.append('image', blob, 'capture.png');
             formData.append('hazard', hazardType); 
-            if (currentUserLocation) {
-                formData.append('lat', currentUserLocation.lat);
-                formData.append('lng', currentUserLocation.lng);
-            }
 
             const headers = {};
             const hfToken = import.meta.env.VITE_HF_TOKEN;
@@ -407,42 +398,36 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
             // Handle V2 Response with Validation Logic (Step 8)
             if (data.prediction) {
                 const aiStatus = data.status === true ? 'Verified' : 'Mismatch';
-                const jurisdiction = data.jurisdiction || { Authority: 'Unknown Jurisdiction' };
                 
-                // Set Priority based on hazard type (simplified logic)
-                let priority = "Medium";
-                if (["Potholes", "Fallen trees", "Road accidents", "Damaged manholes"].includes(hazardType)) {
-                    priority = "High";
-                }
-                
-                setPreviewData({
-                    type: hazardType,
-                    aiPrediction: data.prediction,
-                    img: photoPreview,
-                    conf: data.confidence,
-                    status: aiStatus,
-                    addr: readableAddress,
-                    jurisdiction: jurisdiction,
-                    priority: priority
-                });
-                setEditableLandmark(readableAddress);
-                
-                if (data.status !== true) {
-                    setValidationError(`AI predicted "${data.prediction}". Please confirm your selection before submitting.`);
+                if (data.status === true) {
+                    // Success Match
+                    onSubmit(hazardType, photoPreview, data.confidence, aiStatus, readableAddress);
+                } else {
+                    // Mismatch Detected (Step 8 Logic)
+                    const msg = `AI processing: You selected "${hazardType}" and AI predicted "${data.prediction}", are you sure?`;
+                    setValidationError(msg);
+                    setForceSubmitAllowed(true);
+                    
+                    // If user clicks "Sure" afterwards, we'll call onSubmit with 'Mismatch'
+                    // We need to persist these values for the force-submit click
+                    window._pendingHazardData = { 
+                        type: hazardType, 
+                        img: photoPreview, 
+                        conf: data.confidence, 
+                        status: aiStatus, 
+                        addr: readableAddress 
+                    };
                 }
             } else if (data.error) {
                 setValidationError("AI Error: " + data.error);
-                setPreviewData({
-                    type: hazardType,
-                    aiPrediction: 'Error',
-                    img: photoPreview,
-                    conf: 0,
-                    status: 'Pending',
-                    addr: readableAddress,
-                    jurisdiction: { Authority: 'Unknown Jurisdiction' },
-                    priority: 'Medium'
-                });
-                setEditableLandmark(readableAddress);
+                setForceSubmitAllowed(true);
+                window._pendingHazardData = { 
+                    type: hazardType, 
+                    img: photoPreview, 
+                    conf: 0, 
+                    status: 'Pending', 
+                    addr: readableAddress 
+                };
             }
         } catch (err) {
             console.error("AI Error:", err);
@@ -456,17 +441,13 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
             setForceSubmitAllowed(true);
             
             // Fallback for unreachable AI
-            setPreviewData({
-                type: hazardType,
-                aiPrediction: 'Unreachable',
-                img: photoPreview,
-                conf: 0,
-                status: 'Unreachable',
-                addr: 'GPS Location Source',
-                jurisdiction: { Authority: 'Unknown Jurisdiction' },
-                priority: 'Medium'
-            });
-            setEditableLandmark('GPS Location Source');
+            window._pendingHazardData = { 
+                type: hazardType, 
+                img: photoPreview, 
+                conf: 0, 
+                status: 'Unreachable', 
+                addr: 'GPS Location Source' 
+            };
         } finally {
             setIsProcessing(false);
         }
@@ -478,7 +459,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
 
     return (
         <>
-            {/* ΓöÇΓöÇ Full-screen camera overlay ΓöÇΓöÇ */}
+            {/* ── Full-screen camera overlay ── */}
             {cameraActive && (
                 <div style={{
                     position: 'fixed', inset: 0, zIndex: 9999,
@@ -520,7 +501,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                                 background: '#1a1a1a', color: '#888', gap: '0.75rem',
                             }}>
                                 <span className="material-icons-round" style={{ fontSize: '3.5rem', color: '#555' }}>videocam_off</span>
-                                <span style={{ fontSize: '1rem' }}>Camera unavailable ΓÇö tap shutter for mock photo</span>
+                                <span style={{ fontSize: '1rem' }}>Camera unavailable — tap shutter for mock photo</span>
                             </div>
                         )
                     }
@@ -565,7 +546,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                 </div>
             )}
 
-            {/* ΓöÇΓöÇ Report form ΓöÇΓöÇ */}
+            {/* ── Report form ── */}
             <section className="absolute inset-0 flex flex-col z-10 animate-fade-in overflow-y-auto" style={{ fontFamily: "'Outfit', sans-serif", background: 'transparent', paddingBottom: '6rem' }}>
 
                 {/* Animated background canvas */}
@@ -601,9 +582,9 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                             e.currentTarget.style.transform = 'scale(1)';
                             e.currentTarget.style.boxShadow = 'none';
                         }}
-                        onClick={toggleSidebar}
+                        onClick={() => navigateTo('home')}
                     >
-                        <span className="material-icons-round text-white">menu</span>
+                        <span className="material-icons-round text-white">arrow_back</span>
                     </button>
 
                     {/* Icon + Title */}
@@ -644,7 +625,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                         background: 'linear-gradient(90deg, transparent, rgba(255,107,107,0.5), rgba(255,142,83,0.5), transparent)',
                     }} />
 
-                    {/* ΓöÇΓöÇ Camera tap area ΓöÇΓöÇ */}
+                    {/* ── Camera tap area ── */}
                     <div
                         onClick={openCamera}
                         onMouseEnter={() => setCameraHovered(true)}
@@ -761,7 +742,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                         )}
                     </div>
 
-                    {/* ΓöÇΓöÇ Hazard Type selector ΓöÇΓöÇ */}
+                    {/* ── Hazard Type selector ── */}
                     <div style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
                         <label style={{
                             display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -810,32 +791,32 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                                     e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                                 }}
                             >
-                                <option value="" disabled style={{ background: '#0a0a0a', color: '#888' }}>Select Hazard Type</option>
-                                <option value="" disabled style={{ background: '#0a0a0a', color: '#888' }}>--- ROAD HAZARDS CATEGORY ---</option>
-                                <optgroup label="1. Road Infrastructure Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Potholes" style={{ background: '#0a0a0a' }}>Potholes</option>
-                                    <option value="Road cracks" style={{ background: '#0a0a0a' }}>Road cracks</option>
-                                    <option value="Uneven roads" style={{ background: '#0a0a0a' }}>Uneven roads</option>
-                                    <option value="Damaged manholes" style={{ background: '#0a0a0a' }}>Damaged manholes</option>
+                                <option value="" disabled style={{ background: '#1e2d4a', color: '#888' }}>Select Hazard Type</option>
+                                <option value="" disabled style={{ background: '#1e2d4a', color: '#888' }}>--- ROAD HAZARDS CATEGORY 🚦 ---</option>
+                                <optgroup label="1️⃣ Road Infrastructure Hazards" style={{ background: '#1e2d4a' }}>
+                                    <option value="Potholes" style={{ background: '#1e2d4a' }}>Potholes</option>
+                                    <option value="Road cracks" style={{ background: '#1e2d4a' }}>Road cracks</option>
+                                    <option value="Uneven roads" style={{ background: '#1e2d4a' }}>Uneven roads</option>
+                                    <option value="Damaged manholes" style={{ background: '#1e2d4a' }}>Damaged manholes</option>
                                 </optgroup>
-                                <optgroup label="2. Traffic System Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Non-functioning traffic signals" style={{ background: '#0a0a0a' }}>Non-functioning traffic signals</option>
-                                    <option value="Broken or bent traffic signs" style={{ background: '#0a0a0a' }}>Broken or bent traffic signs</option>
-                                    <option value="Non-working street lights" style={{ background: '#0a0a0a' }}>Non-working street lights</option>
-                                    <option value="Missing signboards" style={{ background: '#0a0a0a' }}>Missing signboards</option>
-                                    <option value="Improperly placed barricades" style={{ background: '#0a0a0a' }}>Improperly placed barricades</option>
+                                <optgroup label="2️⃣ Traffic System Hazards" style={{ background: '#1e2d4a' }}>
+                                    <option value="Non-functioning traffic signals" style={{ background: '#1e2d4a' }}>Non-functioning traffic signals</option>
+                                    <option value="Broken or bent traffic signs" style={{ background: '#1e2d4a' }}>Broken or bent traffic signs</option>
+                                    <option value="Non-working street lights" style={{ background: '#1e2d4a' }}>Non-working street lights</option>
+                                    <option value="Missing signboards" style={{ background: '#1e2d4a' }}>Missing signboards</option>
+                                    <option value="Improperly placed barricades" style={{ background: '#1e2d4a' }}>Improperly placed barricades</option>
                                 </optgroup>
-                                <optgroup label="3. Environmental Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Fallen trees" style={{ background: '#0a0a0a' }}>Fallen trees</option>
-                                    <option value="Debris on road" style={{ background: '#0a0a0a' }}>Debris on road</option>
+                                <optgroup label="3️⃣ Environmental Hazards" style={{ background: '#1e2d4a' }}>
+                                    <option value="Fallen trees" style={{ background: '#1e2d4a' }}>Fallen trees</option>
+                                    <option value="Debris on road" style={{ background: '#1e2d4a' }}>Debris on road</option>
                                 </optgroup>
-                                <optgroup label="4. Emergency Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Road accidents" style={{ background: '#0a0a0a' }}>Road accidents</option>
-                                    <option value="Vehicle breakdown" style={{ background: '#0a0a0a' }}>Vehicle breakdown</option>
+                                <optgroup label="4️⃣ Emergency Hazards" style={{ background: '#1e2d4a' }}>
+                                    <option value="Road accidents" style={{ background: '#1e2d4a' }}>Road accidents</option>
+                                    <option value="Vehicle breakdown" style={{ background: '#1e2d4a' }}>Vehicle breakdown</option>
                                 </optgroup>
-                                <optgroup label="5. Climatic Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Waterlogging / flooded roads" style={{ background: '#0a0a0a' }}>Waterlogging / flooded roads</option>
-                                    <option value="Low visibility zones" style={{ background: '#0a0a0a' }}>Low visibility zones (due to Fog, Mist, etc.)</option>
+                                <optgroup label="5️⃣ Climatic Hazards" style={{ background: '#1e2d4a' }}>
+                                    <option value="Waterlogging / flooded roads" style={{ background: '#1e2d4a' }}>Waterlogging / flooded roads</option>
+                                    <option value="Low visibility zones" style={{ background: '#1e2d4a' }}>Low visibility zones (due to Fog, Mist, etc.)</option>
                                 </optgroup>
                             </select>
                             {/* Custom chevron */}
@@ -850,7 +831,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                         </div>
                     </div>
 
-                    {/* ΓöÇΓöÇ Location ΓöÇΓöÇ */}
+                    {/* ── Location ── */}
                     <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
                         <label style={{
                             display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -908,7 +889,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                         </div>
                     </div>
 
-                    {/* ΓöÇΓöÇ Validation error ΓöÇΓöÇ */}
+                    {/* ── Validation error ── */}
                     {validationError && (
                         <div style={{
                             marginBottom: '1rem',
@@ -929,7 +910,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                         </div>
                     )}
 
-                    {/* ΓöÇΓöÇ Submit button ΓöÇΓöÇ */}
+                    {/* ── Submit button ── */}
                     <button
                         id="submit-report-btn"
                         onClick={handleSubmit}
@@ -1050,115 +1031,11 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                 </div>
             </section>
 
-            {/* --- NEW: Submission Preview Overlay --- */}
-            {previewData && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 60,
-                    background: 'rgba(5,5,5,0.85)', backdropFilter: 'blur(12px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '1rem'
-                }}>
-                    <div style={{
-                        background: '#111', border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '1.25rem', width: '100%', maxWidth: '28rem',
-                        padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem',
-                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-                        animation: 'fadeInUp 0.4s ease-out forwards'
-                    }}>
-                        <div style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
-                            <span className="material-icons-round" style={{ fontSize: '2.5rem', color: '#4ade80', marginBottom: '0.5rem' }}>verified_user</span>
-                            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', margin: 0 }}>Submission Preview</h3>
-                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>Review your hazard report before final submission</p>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Hazard Type:</span>
-                                <span style={{ color: '#fff', fontWeight: 600 }}>{previewData.type}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Authority:</span>
-                                <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>{previewData.jurisdiction?.Authority}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Jurisdiction Type:</span>
-                                <span style={{ color: '#fff', fontWeight: 600 }}>{previewData.jurisdiction?.Type}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Details (Zone/Ward):</span>
-                                <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>{previewData.jurisdiction?.Details}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Priority:</span>
-                                <span style={{ color: previewData.priority === 'High' ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>{previewData.priority}</span>
-                            </div>
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Nearby Landmark (Editable):</span>
-                                <input 
-                                    type="text" 
-                                    value={editableLandmark}
-                                    onChange={(e) => setEditableLandmark(e.target.value)}
-                                    maxLength={80}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                                        color: '#fff', padding: '0.75rem', borderRadius: '0.5rem', width: '100%',
-                                        outline: 'none', fontFamily: 'inherit'
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                            <button 
-                                onClick={() => {
-                                    setPreviewData(null);
-                                    setForceSubmitAllowed(false);
-                                }}
-                                style={{
-                                    flex: 1, padding: '0.85rem', borderRadius: '0.75rem', fontWeight: 600,
-                                    background: 'rgba(255,255,255,0.08)', color: '#fff', border: 'none',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Edit
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    onSubmit(
-                                        previewData.type, 
-                                        previewData.img, 
-                                        previewData.conf, 
-                                        previewData.status, 
-                                        editableLandmark, 
-                                        previewData.jurisdiction,
-                                        previewData.priority
-                                    );
-                                    setPreviewData(null);
-                                }}
-                                style={{
-                                    flex: 2, padding: '0.85rem', borderRadius: '0.75rem', fontWeight: 600,
-                                    background: 'linear-gradient(135deg, #4ade80, #22c55e)', color: '#000', border: 'none',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
-                                }}
-                            >
-                                <span className="material-icons-round" style={{ fontSize: '1.2rem' }}>send</span>
-                                Submit Report
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Keyframe injections */}
             <style>{`
                 @keyframes pulse-dot {
                     0%, 100% { opacity: 1; transform: scale(1); }
                     50% { opacity: 0.5; transform: scale(0.75); }
-                }
-                @keyframes fadeInUp {
-                    0% { opacity: 0; transform: translateY(20px); }
-                    100% { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes shimmer-sweep {
                     0%   { transform: translateX(-100%); }

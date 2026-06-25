@@ -36,10 +36,10 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
             <div className="flex items-center justify-between p-6 shrink-0 bg-transparent flex-wrap gap-4">
                 <div className="flex items-center gap-3">
                     <button 
-                        onClick={() => navigateTo('home')}
-                        className="p-2 rounded-full bg-white/5 hover:bg-white/15 transition-all active:scale-90 group"
+                        onClick={toggleSidebar}
+                        className="p-2 rounded-full bg-white/5 hover:bg-white/15 transition-all active:scale-90 group flex items-center justify-center"
                     >
-                        <span className="material-icons-round text-slate-400 group-hover:text-white transition-colors">arrow_back</span>
+                        <span className="material-icons-round text-slate-400 group-hover:text-white transition-colors">menu</span>
                     </button>
                     <h2 className="text-2xl font-bold text-white">{t('dashboardTitle')}</h2>
                 </div>
@@ -149,26 +149,51 @@ const DashboardScreen = ({ isActive, navigateTo, hazards, currentUser, toggleSid
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex flex-col mb-1">
-                                    <h4 className={`font-bold truncate ${hazard.resolved ? 'text-gray-400 line-through' : 'text-white'}`}>{hazard.type}</h4>
-                                    <div className="mt-1 flex items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className={`font-bold truncate ${hazard.resolved ? 'text-gray-400 line-through' : 'text-white'}`}>{hazard.type}</h4>
+                                        {/* Authority Badge */}
+                                        {hazard.jurisdiction && hazard.jurisdiction.Type && (
+                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border w-fit ${
+                                                hazard.jurisdiction.Type === 'State Highway' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
+                                                hazard.jurisdiction.Type === 'National Highway' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                                                'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                                            }`}>
+                                                {hazard.jurisdiction.Type}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-400 mt-0.5 truncate">
+                                        {hazard.jurisdiction?.Authority || 'Unknown Authority'}
+                                        {hazard.jurisdiction?.Details ? ` • ${hazard.jurisdiction.Details}` : ''}
+                                    </div>
+                                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                                         {hazard.resolved ? (
                                             <span className="text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded font-bold uppercase border border-green-500/30 flex items-center gap-1 w-fit">
                                                 <span className="material-icons-round text-[10px]">check_circle</span>
-                                                Resolved
+                                                Closed
                                             </span>
                                         ) : (
+                                            <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded font-bold uppercase border border-yellow-500/30 flex items-center gap-1 w-fit">
+                                                <span className="material-icons-round text-[10px]">hourglass_empty</span>
+                                                {hazard.status || 'Pending'}
+                                            </span>
+                                        )}
+                                        {/* Days Open Tracker */}
+                                        {!hazard.resolved && hazard.timestamp && (
+                                            <span className="text-[10px] bg-white/5 text-gray-300 px-2 py-0.5 rounded font-bold uppercase border border-white/10 w-fit">
+                                                Days Open: {Math.max(0, Math.floor((Date.now() - (hazard.timestamp.seconds * 1000 || hazard.timestamp.toMillis?.() || Date.now())) / (1000 * 60 * 60 * 24)))}
+                                            </span>
+                                        )}
+                                        {hazard.isCritical && (
                                             <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-bold uppercase border border-red-500/30 w-fit">
                                                 High Priority
                                             </span>
                                         )}
                                     </div>
                                 </div>
-                                <p className="text-xs text-gray-300 flex items-center gap-1 mt-2">
+                                <p className="text-xs text-gray-300 flex items-center gap-1 mt-2 truncate">
                                     <span className="material-icons-round text-[12px]">location_on</span>
-                                    {hazard.lat?.toFixed(4) || 0}, {hazard.lng?.toFixed(4) || 0}
-                                </p>
-                                <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-mono">
-                                    Node: Cloud-Sync
+                                    {hazard.landmark || hazard.address || `${hazard.lat?.toFixed(4)}, ${hazard.lng?.toFixed(4)}`}
                                 </p>
                             </div>
 

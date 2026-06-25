@@ -103,7 +103,9 @@ function App() {
                 type: hazardData.type,
                 lat: hazardData.lat,
                 lng: hazardData.lng,
-                address: hazardData.address || "Unknown Location",
+                address: hazardData.address || "Unknown Location", // Used as Landmark
+                landmark: hazardData.address || "Unknown Location",
+                priority: hazardData.priority || "Medium",
                 image: imageUrl,
                 confidence: hazardData.confidence || 0.85,
                 timestamp: serverTimestamp(),
@@ -113,7 +115,7 @@ function App() {
                 status: hazardData.status || 'Pending',
                 verification_status: hazardData.status === 'Verified' ? 'Verified' : 'Pending',
                 resolved: false,
-                isCritical: false,
+                isCritical: hazardData.priority === 'High',
                 jurisdiction: hazardData.jurisdiction || { Authority: 'Unknown Jurisdiction' }
             };
 
@@ -171,8 +173,9 @@ function App() {
                     <ReportScreen
                         isActive={currentScreen === 'report'}
                         navigateTo={navigateTo}
+                        toggleSidebar={toggleSidebar}
                         currentUserLocation={currentUserLocation}
-                        onSubmit={(type, img, conf, status, addr, jurisdiction) => {
+                        onSubmit={(type, img, conf, status, addr, jurisdiction, priority) => {
                             submitReport({
                                 type,
                                 image: img,
@@ -180,11 +183,11 @@ function App() {
                                 lng: currentUserLocation?.lng,
                                 confidence: conf,
                                 status,
-                                address: addr,
-                                jurisdiction: jurisdiction
+                                address: addr, // Serves as landmark
+                                jurisdiction: jurisdiction,
+                                priority: priority
                             });
                         }}
-                        isUploading={isUploading}
                     />
                     <MapScreen
                         isActive={currentScreen === 'map'}

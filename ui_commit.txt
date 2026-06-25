@@ -1,0 +1,2358 @@
+commit 1a8e592ddb6dd73afcf8eb0d2a197f2e776fd739
+Author: Ajay-710 <ajaybosshoss@gmail.com>
+Date:   Sat Mar 28 12:36:20 2026 +0530
+
+    update in UI, auth
+
+diff --git a/.firebase/hosting.Um9hZEhhemVYX0FkbWluXGRpc3Q.cache b/.firebase/hosting.Um9hZEhhemVYX0FkbWluXGRpc3Q.cache
+index 60a6c8b3..450b0291 100644
+--- a/.firebase/hosting.Um9hZEhhemVYX0FkbWluXGRpc3Q.cache
++++ b/.firebase/hosting.Um9hZEhhemVYX0FkbWluXGRpc3Q.cache
+@@ -1,3 +1,3 @@
+-index.html,1774675909210,f0f611ad3bfc3af1f685023378064f688973ab3cc3e635fd06b30903c9fa797a
+-assets/index-d9151e2f.css,1774675909210,dc550fdf7731415b8f9651c95243f84f2348f06446e8db58a3a4cce7e300fb54
+-assets/index-6856aafd.js,1774675909210,d527dbd41a5a569a509066f2f629dd08548e43fad07f4261a1cb8bd82c36be61
++index.html,1774679279027,97a001050d04ba5663b061102ca267fab0c46ed6e8ce5fa9d526531b1aff6834
++assets/index-ec07e867.css,1774679279027,4f4dfc4e6f90178293112fc696005c881666513a7143676f873795b89c3aba5b
++assets/index-7c4d8d30.js,1774679279032,772b9839105bcc2cdf2f2aca989fe8faee727304fd91527a76f7535de7359003
+diff --git a/.firebase/hosting.ZGlzdA.cache b/.firebase/hosting.ZGlzdA.cache
+index 01200ad9..2cfea202 100644
+--- a/.firebase/hosting.ZGlzdA.cache
++++ b/.firebase/hosting.ZGlzdA.cache
+@@ -1,3 +1,3 @@
+-index.html,1774677529903,b8c24bc9823af9650716c9ad02ab4ea2ea15d02587629250af6a45b5ade18f2a
+-assets/index-CNjs1hUx.css,1774677529904,d3450ee000c6266fb4a76203e7010b9038bd84a36da28d26d1dc72843d96fe42
+-assets/index-sMlKThgs.js,1774677529905,249efa70fd1218e26bba45a85893303a6f7c90f23a5388f0bc2daeee8f11ce7b
++index.html,1774681400724,4cfd50a5f99e903a1c74a47b37f984bb94e871f5ed0ad84e1c5097a97254335d
++assets/index--tZExd_x.css,1774681400724,8098170047bb864482e4cbe54aa607f92d9a2bea1ffa8634b7ec8a03fbe9d4d4
++assets/index-WUlEmAV7.js,1774681400724,af26e6264f50fa2b7336d5cd0278cdbc9ea5716ecf9b10c9ad06872a01ed9067
+diff --git a/RoadHazeX_Admin/src/App.jsx b/RoadHazeX_Admin/src/App.jsx
+index dc4567e8..a37376ce 100644
+--- a/RoadHazeX_Admin/src/App.jsx
++++ b/RoadHazeX_Admin/src/App.jsx
+@@ -1,230 +1,209 @@
+ import React, { useState, useEffect } from 'react';
+-import { SignedIn, SignedOut, SignIn, UserButton, useUser } from '@clerk/clerk-react';
+-import AdminDashboard from './AdminDashboard';
+-import { db, auth } from './firebase';
++import { auth, db } from './firebase';
++import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+ import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+-import { signInWithCustomToken } from 'firebase/auth';
+-
++import AdminDashboard from './AdminDashboard';
+ 
+ function App() {
+   const [hazards, setHazards] = useState([]);
+-  const [isLoaded, setIsLoaded] = useState(false);
++  const [isDataLoaded, setIsDataLoaded] = useState(false);
+   const [userRole, setUserRole] = useState(null);
+   const [isCheckingRole, setIsCheckingRole] = useState(true);
+-  const { user } = useUser();
++  const [user, setUser] = useState(null);
++  const [isAuthLoaded, setIsAuthLoaded] = useState(false);
++
++  const AUTHORIZED_EMAIL = 'roadhazex@gmail.com';
+ 
+-  // --- Python-Firebase Auth Bridge ---
++  // --- Auth & Role Sync ---
+   useEffect(() => {
+-    const bridgeAuth = async () => {
+-      if (user) {
++    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
++      setUser(authUser);
++      setIsAuthLoaded(true);
++
++      if (authUser) {
++        setIsCheckingRole(true);
++        const userEmail = authUser.email;
++        const userDocRef = doc(db, "users", authUser.uid);
++        
++        console.log(`🔍 Checking Admin Access for: ${userEmail}`);
++
+         try {
+-          const clerkToken = await user.getToken();
+-          const syncResponse = await fetch("http://localhost:7860/auth/sync", {
+-            method: "POST",
+-            headers: { "Authorization": `Bearer ${clerkToken}` }
+-          });
+-          const syncData = await syncResponse.json();
+-          if (syncData.firebase_token) {
+-            await signInWithCustomToken(auth, syncData.firebase_token);
+-            console.log("🔐 Admin Bridge Verified via Backend.");
++          const userSnap = await getDoc(userDocRef);
++          
++          if (userSnap.exists()) {
++            const cloudRole = userSnap.data().role;
++            // Force Admin role for official email
++            if (userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() && cloudRole !== 'admin') {
++              await setDoc(userDocRef, { role: 'admin' }, { merge: true });
++              setUserRole('admin');
++            } else {
++              setUserRole(cloudRole);
++            }
++          } else {
++            // Auto-assign admin role for official account
++            const initialRole = userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() ? 'admin' : 'user';
++            await setDoc(userDocRef, {
++              email: userEmail,
++              role: initialRole,
++              displayName: authUser.displayName || 'Unknown Official',
++              createdAt: serverTimestamp()
++            });
++            setUserRole(initialRole);
+           }
+         } catch (err) {
+-          console.warn("Auth sync failed via Python.", err);
++          console.error("Role sync error:", err);
++        } finally {
++          setIsCheckingRole(false);
+         }
++      } else {
++        setUserRole(null);
++        setIsCheckingRole(false);
+       }
+-    };
+-    bridgeAuth();
+-  }, [user]);
+-
+-
+-
+-  const AUTHORIZED_EMAIL = 'roadhazex@gmail.com';
+-
+-  // --- Real-time Hazard Listener ---
+-  useEffect(() => {
+-    const q = query(collection(db, "hazards"), orderBy("timestamp", "desc"));
+-    const unsubscribe = onSnapshot(q, (snapshot) => {
+-      const hazardList = [];
+-      snapshot.forEach((doc) => {
+-        hazardList.push({ id: doc.id, ...doc.data() });
+-      });
+-      setHazards(hazardList);
+-      setIsLoaded(true);
+-    }, (error) => {
+-      console.error("Firebase fetch error:", error);
+     });
+ 
+     return () => unsubscribe();
+   }, []);
+ 
+-  // --- Role Based System ---
++  // --- Real-time Hazard Listener ---
+   useEffect(() => {
+-    const syncUserRole = async () => {
+-      if (!user) {
+-        setUserRole(null);
+-        setIsCheckingRole(false);
+-        return;
+-      }
+-
+-      const userEmail = user.primaryEmailAddress?.emailAddress;
+-      const userDocRef = doc(db, "users", user.id);
+-      
+-      console.log(`🔍 Checking access for: ${userEmail}`);
+-
+-      try {
+-        const userSnap = await getDoc(userDocRef);
+-        
+-        if (userSnap.exists()) {
+-          const cloudRole = userSnap.data().role;
+-          // Force Admin role for official email even if it exists as user
+-          if (userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() && cloudRole !== 'admin') {
+-            await setDoc(userDocRef, { role: 'admin' }, { merge: true });
+-            setUserRole('admin');
+-          } else {
+-            setUserRole(cloudRole);
+-          }
+-        } else {
+-          // Auto-assign admin role for the specified official account
+-          const initialRole = userEmail.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase() ? 'admin' : 'user';
+-          await setDoc(userDocRef, {
+-            email: userEmail,
+-            role: initialRole,
+-            username: user.username || user.fullName || 'Unknown',
+-            createdAt: serverTimestamp()
++    if (user && userRole === 'admin') {
++        const q = query(collection(db, "hazards"), orderBy("timestamp", "desc"));
++        const unsubscribe = onSnapshot(q, (snapshot) => {
++          const hazardList = [];
++          snapshot.forEach((doc) => {
++            hazardList.push({ id: doc.id, ...doc.data() });
+           });
+-          setUserRole(initialRole);
+-        }
++          setHazards(hazardList);
++          setIsDataLoaded(true);
++        }, (error) => {
++          console.error("Firebase fetch error:", error);
++        });
++        return () => unsubscribe();
++    }
++  }, [user, userRole]);
++
++  const handleLogin = async () => {
++      const provider = new GoogleAuthProvider();
++      try {
++          await signInWithPopup(auth, provider);
+       } catch (err) {
+-        console.error("Role sync error:", err);
+-      } finally {
+-        setIsCheckingRole(false);
++          console.error("Login Error:", err);
++          alert("Login failed: " + err.message);
+       }
++  };
+ 
+-    };
++  const handleSignOut = () => signOut(auth);
+ 
+-    syncUserRole();
+-  }, [user]);
++  if (!isAuthLoaded) {
++    return (
++        <div className="w-full h-screen bg-[#020617] flex items-center justify-center">
++            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
++        </div>
++    );
++  }
++
++  // --- Main Render Logic ---
++  if (!user) {
++    /* Sign In View */
++    return (
++        <div className="w-full h-screen bg-[#020617] overflow-hidden flex flex-col items-center justify-center p-6 relative">
++             <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]"></div>
++             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[140px]"></div>
+ 
+-  const userEmail = user?.primaryEmailAddress?.emailAddress;
+-  const isAuthorized = userRole === 'admin' && userEmail?.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase();
++             <div className="relative z-10 w-full max-w-[1240px] flex flex-col md:flex-row items-center gap-20">
++                 <div className="flex-1 text-center md:text-left space-y-8">
++                      <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-4">
++                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
++                          <span className="text-[11px] font-black text-blue-400 uppercase tracking-[0.2em]">Restricted Node 0x7F</span>
++                      </div>
++                      <h1 className="text-6xl md:text-8xl font-black text-white leading-[0.9] tracking-tighter">
++                         COMMAND<br/>
++                         <span className="text-linear-to-r from-blue-400 to-cyan-400">CENTER</span>
++                      </h1>
++                      <p className="text-xl text-slate-500 font-medium max-w-md leading-relaxed">
++                         Access the RoadHazardX municipal infrastructure. Resolve incidents and monitor regional telemetry.
++                      </p>
++                 </div>
+ 
++                 <div className="w-full max-w-md bg-slate-950/60 backdrop-blur-3xl p-12 rounded-[52px] border border-white/5 shadow-3xl text-center space-y-10 group">
++                      <div className="w-24 h-24 rounded-[40px] bg-slate-900 border border-white/10 flex items-center justify-center mx-auto shadow-2xl group-hover:border-blue-500/30 transition-all">
++                          <span className="material-icons-round text-blue-500 text-5xl group-hover:scale-110 transition-transform">terminal</span>
++                      </div>
++                      <div>
++                          <h2 className="text-3xl font-black text-white mb-2">Identify Official</h2>
++                          <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Administrative Verification Requested</p>
++                      </div>
++                      <button 
++                        onClick={handleLogin}
++                        className="w-full flex items-center justify-center gap-4 bg-white/5 hover:bg-white/10 px-8 py-5 rounded-3xl border border-white/5 hover:border-white/20 transition-all active:scale-95 shadow-2xl"
++                      >
++                         <svg className="w-6 h-6" viewBox="0 0 48 48">
++                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
++                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
++                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
++                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
++                         </svg>
++                         <span className="text-white font-black text-sm tracking-wide">Continue as Official</span>
++                      </button>
++                      <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest leading-none">Automatic Biometric & Keycloak Handshake</p>
++                 </div>
++             </div>
++        </div>
++    );
++  }
+ 
++  if (isCheckingRole) {
++    return (
++        <div className="w-full h-screen bg-[#020617] flex items-center justify-center">
++            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
++        </div>
++    );
++  }
+ 
++  const isAuthorized = userRole === 'admin' && user.email?.toLowerCase() === AUTHORIZED_EMAIL.toLowerCase();
+ 
+   return (
+     <div className="w-full h-screen bg-[#020617] overflow-hidden">
+-      <SignedIn>
+-        {isCheckingRole ? (
+-          <div className="w-full h-full flex items-center justify-center bg-[#020617]">
+-              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+-          </div>
+-        ) : isAuthorized ? (
+-          /* Main Administrative Dashboard */
++        {isAuthorized ? (
+           <div className="w-full h-full flex flex-col relative animate-fade-in">
+                <AdminDashboard hazards={hazards} userRole={userRole} />
+-
+-               
+-               {/* Floating Clerk Profile Trigger */}
+-               <div className="absolute top-4 right-4 z-50">
+-                   <div className="bg-slate-900/80 backdrop-blur-md p-1 rounded-full border border-white/10 shadow-2xl flex items-center gap-2 pl-3 pr-1">
+-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none pr-1">Authorized Official</span>
+-                       <UserButton afterSignOutUrl="/" />
++               {/* Fixed Sign Out Control */}
++               <div className="fixed top-6 right-8 z-[100] group flex items-center gap-3 bg-slate-900/40 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/5 shadow-3xl">
++                   <div className="flex flex-col items-end mr-3">
++                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Official Account</span>
++                       <span className="text-xs font-bold text-white mt-1">{user.displayName}</span>
+                    </div>
++                   {user.photoURL && <img src={user.photoURL} alt="avatar" className="w-10 h-10 rounded-xl border border-blue-500/30 shadow-lg" />}
++                   <button 
++                        onClick={handleSignOut}
++                        className="w-10 h-10 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 flex items-center justify-center transition-all border border-orange-500/20"
++                        title="Disconnect Console"
++                   >
++                        <span className="material-icons-round text-xl">power_settings_new</span>
++                   </button>
+                </div>
+           </div>
+         ) : (
+-          /* Access Restricted View */
+           <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">
+-               <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-3xl p-10 rounded-[40px] border border-white/10 shadow-2xl relative z-10 text-center space-y-6">
++               <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-3xl p-10 rounded-[40px] border border-red-500/20 shadow-2xl relative z-10 text-center space-y-6">
+                     <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+                         <span className="material-icons-round text-red-500 text-4xl">gpp_maybe</span>
+                     </div>
+-                    <h2 className="text-3xl font-black text-white leading-tight">Access <br/> Restricted</h2>
++                    <h2 className="text-3xl font-black text-white leading-tight uppercase tracking-tighter">Access <br/> Denied</h2>
+                     <p className="text-slate-400 text-sm font-medium leading-relaxed">
+-                        The account <strong>{userEmail}</strong> is not authorized to access this municipal node. 
+-                        Please sign in with the official department credentials.
++                        The account <strong>{user.email}</strong> is not recognized as a Municipal Admin. 
++                        Please disconnect and identify with official credentials.
+                     </p>
+-                    <div className="pt-4">
+-                        <UserButton afterSignOutUrl="/" showName />
+-                    </div>
++                    <button 
++                        onClick={handleSignOut}
++                        className="w-full py-4 rounded-3xl bg-red-500 text-white font-black uppercase tracking-widest text-sm shadow-xl shadow-red-900/40 transform active:scale-95 transition-all"
++                    >
++                        Disconnect User
++                    </button>
+                </div>
+-               {/* Decorative background for error */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 rounded-full blur-[120px] -z-10"></div>
+           </div>
+         )}
+-      </SignedIn>
+-
+-
+-      <SignedOut>
+-        <div className="w-full h-full flex items-center justify-center p-6 bg-command-center relative overflow-hidden">
+-             {/* Decorative Elements */}
+-             <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px]"></div>
+-             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[140px]"></div>
+-
+-             <div className="w-full max-w-[1200px] flex flex-col md:flex-row items-center gap-16 relative z-10">
+-                 {/* Left Side: Branding */}
+-                 <div className="flex-1 text-center md:text-left space-y-8 max-w-xl">
+-                      <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-4">
+-                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+-                          <span className="text-[11px] font-black text-blue-400 uppercase tracking-[0.2em]">Secure Node 0x7F</span>
+-                      </div>
+-                      <h1 className="text-6xl md:text-7xl font-black text-white leading-none tracking-tight">
+-                         Municipal <br/>
+-                         <span className="text-linear-to-r from-blue-400 to-cyan-400">Command Center</span>
+-                      </h1>
+-                      <p className="text-lg text-slate-400 font-medium leading-relaxed max-w-md mx-auto md:mx-0">
+-                         Authorized personnel only. Access the real-time road safety infrastructure and hazard resolution engine.
+-                      </p>
+-                      
+-                      <div className="pt-8 flex flex-col md:flex-row gap-8 items-center md:items-start opacity-60">
+-                           <div className="flex items-center gap-3">
+-                                <span className="material-icons-round text-blue-500 text-3xl">verified_user</span>
+-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">Real-Time <br/> Verification</div>
+-                           </div>
+-                           <div className="flex items-center gap-3">
+-                                <span className="material-icons-round text-cyan-400 text-3xl">terminal</span>
+-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">Incident <br/> Management</div>
+-                           </div>
+-                      </div>
+-                 </div>
+-
+-                 {/* Right Side: Clerk SignIn */}
+-                 <div className="w-full max-w-md shrink-0">
+-                      <div className="p-1 rounded-[44px] bg-linear-to-br from-white/10 to-white/0 shadow-2xl relative">
+-                           <div className="absolute -inset-4 bg-blue-500/10 blur-3xl -z-10 rounded-full"></div>
+-                           <div className="bg-slate-900/60 backdrop-blur-2xl rounded-[40px] p-2 border border-white/5">
+-                                <SignIn 
+-                                    appearance={{
+-                                        elements: {
+-                                            rootBox: "w-full",
+-                                            card: "bg-transparent shadow-none border-none p-4",
+-                                            headerTitle: "text-white text-xl font-black uppercase tracking-tight text-center",
+-                                            headerSubtitle: "text-slate-400 text-xs font-bold uppercase tracking-widest text-center",
+-                                            socialButtonsBlockButton: "bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all rounded-2xl",
+-                                            socialButtonsBlockButtonText: "text-white font-bold",
+-                                            dividerLine: "bg-white/5",
+-                                            dividerText: "text-slate-500 text-[10px] font-black uppercase",
+-                                            formFieldLabel: "text-slate-400 text-[10px] font-black uppercase tracking-widest ml-1 mb-2",
+-                                            formFieldInput: "bg-white/5 border border-white/10 text-white rounded-2xl py-3 focus:ring-blue-500/30",
+-                                            formButtonPrimary: "bg-linear-to-r from-blue-600 to-blue-500 hover:scale-[1.02] transform transition-all rounded-2xl py-4 font-black uppercase tracking-widest shadow-xl shadow-blue-900/40",
+-                                            footerActionText: "text-slate-500",
+-                                            footerActionLink: "text-blue-400 font-bold hover:text-blue-300",
+-                                            identityPreviewText: "text-white",
+-                                            identityPreviewEditButtonIcon: "text-blue-400"
+-                                        }
+-                                    }}
+-                                />
+-                           </div>
+-                      </div>
+-                 </div>
+-             </div>
+-
+-             {/* Footer Info */}
+-             <div className="absolute bottom-10 left-0 right-0 text-center opacity-30 pointer-events-none">
+-                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em]">RoadHazeX Administrative Terminal // v3.2.0</div>
+-             </div>
+-        </div>
+-      </SignedOut>
+     </div>
+   );
+ }
+diff --git a/RoadHazeX_Admin/src/main.jsx b/RoadHazeX_Admin/src/main.jsx
+index f318a4da..cfee7c78 100644
+--- a/RoadHazeX_Admin/src/main.jsx
++++ b/RoadHazeX_Admin/src/main.jsx
+@@ -2,18 +2,9 @@ import React from 'react'
+ import ReactDOM from 'react-dom/client'
+ import App from './App.jsx'
+ import './index.css'
+-import { ClerkProvider } from '@clerk/clerk-react'
+-
+-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+-
+-if (!PUBLISHABLE_KEY) {
+-  throw new Error("Missing Publishable Key. Please add VITE_CLERK_PUBLISHABLE_KEY to your .env.local file.")
+-}
+ 
+ ReactDOM.createRoot(document.getElementById('root')).render(
+   <React.StrictMode>
+-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+       <App />
+-    </ClerkProvider>
+   </React.StrictMode>,
+ )
+diff --git a/src/App.jsx b/src/App.jsx
+index 2c47fc6b..ac11441d 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -4,15 +4,13 @@ import HomeScreen from './components/HomeScreen';
+ import ReportScreen from './components/ReportScreen';
+ import MapScreen from './components/MapScreen';
+ import DashboardScreen from './components/DashboardScreen';
+-import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+ import LoginScreen from './components/LoginScreen';
+ import SuccessOverlay from './components/SuccessOverlay';
+ 
+ import { db, storage, auth } from './firebase';
+-import { collection, addDoc, doc, updateDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+-import * as turf from '@turf/turf';
++import { onAuthStateChanged } from 'firebase/auth'; 
++import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+-import { signInWithCustomToken } from 'firebase/auth';
+ 
+ 
+ import HeroSection from './components/HeroSection';
+@@ -20,274 +18,162 @@ import HeroSection from './components/HeroSection';
+ function App() {
+     const [currentScreen, setCurrentScreen] = useState('hero');
+     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+-    const [userLocation, setUserLocation] = useState(null);
+     const [successData, setSuccessData] = useState(null);
+     const [isUploading, setIsUploading] = useState(false);
+-    const { user } = useUser();
+-    const { isLoaded, isSignedIn, user: clerkUser } = useUser();
++    
++    const [user, setUser] = useState(null);
++    const [isAuthLoaded, setIsAuthLoaded] = useState(false);
+ 
+-    // Python-Firebase Auth Bridge
+     useEffect(() => {
+-        const bridgeAuth = async () => {
+-            if (isSignedIn && clerkUser) {
+-                try {
+-                    const clerkToken = await clerkUser.getToken();
+-                    const BACKEND_URL = "http://localhost:7860"; // or your HF Spaces URL
+-
+-                    const syncResponse = await fetch(`${BACKEND_URL}/auth/sync`, {
+-                        method: "POST",
+-                        headers: { "Authorization": `Bearer ${clerkToken}` }
+-                    });
+-
+-                    const syncData = await syncResponse.json();
+-                    if (syncData.firebase_token) {
+-                        await signInWithCustomToken(auth, syncData.firebase_token);
+-                        console.log("🔐 Bridge established via Python Backend");
+-                    }
+-                } catch (err) {
+-                    console.warn("Python-Firebase Bridge sync missed.", err);
+-                }
++        const unsubscribe = onAuthStateChanged(auth, (authUser) => {
++            setUser(authUser);
++            setIsAuthLoaded(true);
++            
++            // Auto-navigate from hero to home if user logs in while on hero
++            if (authUser && currentScreen === 'hero') {
++                // We stay on hero but with auth, 
++                // or we can auto-jump to home if they already logged in before.
++                // However, user said "show animation first", so we keep 'hero' as default.
+             }
+-        };
+-        bridgeAuth();
+-    }, [isSignedIn, clerkUser]);
+-
+-
+-
++        });
++        return () => unsubscribe();
++    }, [currentScreen]);
+ 
+     const [hazards, setHazards] = useState([]);
+ 
+     useEffect(() => {
+-        // Fetch hazards from Firestore in real-time
+-        const q = query(collection(db, "hazards"), orderBy("timestamp", "desc"));
++        const q = query(collection(db, 'hazards'), orderBy('timestamp', 'desc'));
+         const unsubscribe = onSnapshot(q, (snapshot) => {
+-            const hazardList = [];
+-            snapshot.forEach((doc) => {
+-                hazardList.push({ id: doc.id, ...doc.data() });
+-            });
+-            setHazards(hazardList);
+-        }, (error) => {
+-            console.error("Firebase fetch error:", error);
++            const data = snapshot.docs.map(doc => ({
++                id: doc.id,
++                ...doc.data()
++            }));
++            setHazards(data);
+         });
+-
+         return () => unsubscribe();
+     }, []);
+ 
+-    useEffect(() => {
+-        // Watch location
+-        if ("geolocation" in navigator) {
+-            const watchId = navigator.geolocation.watchPosition(
+-                (position) => {
+-                    const { latitude, longitude } = position.coords;
+-                    setUserLocation({ lat: latitude, lng: longitude });
+-                },
+-                (error) => {
+-                    console.error("Location error:", error);
+-                },
+-                { enableHighAccuracy: true }
+-            );
+-
+-            return () => navigator.geolocation.clearWatch(watchId);
+-        }
+-    }, []);
+-
+-    const toggleSidebar = () => {
+-        console.log("🖱️ Sidebar Toggle Requested. Current State:", isSidebarOpen);
+-        setIsSidebarOpen(!isSidebarOpen);
+-    };
+-
++    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+ 
+-    const navigateTo = (screenId) => {
+-        setCurrentScreen(screenId);
+-        setIsSidebarOpen(false); // Close sidebar on nav
++    const navigateTo = (screen) => {
++        setCurrentScreen(screen);
++        setIsSidebarOpen(false);
+     };
+ 
+-    const submitReport = async (type, imageBase64, confidence = 1.0, verificationStatus = 'Pending', address = 'Unknown Location') => {
+-        let lat = 12.9716, lng = 77.5946; // Default
+-
+-        if (userLocation) {
+-            lat = userLocation.lat;
+-            lng = userLocation.lng;
++    const submitReport = async (hazardData) => {
++        if (!user) {
++            setCurrentScreen('login');
++            return;
+         }
+ 
+         setIsUploading(true);
+-
+         try {
+-            // 0. Ensure Firebase Auth is synced with Clerk before upload (via Python)
+-            if (!auth.currentUser && clerkUser) {
+-                try {
+-                    const clerkToken = await clerkUser.getToken();
+-                    const syncResponse = await fetch(`http://localhost:7860/auth/sync`, {
+-                        method: "POST",
+-                        headers: { "Authorization": `Bearer ${clerkToken}` }
+-                    });
+-                    const syncData = await syncResponse.json();
+-                    if (syncData.firebase_token) await signInWithCustomToken(auth, syncData.firebase_token);
+-                } catch (e) {
+-                    console.warn("On-demand auth sync failed:", e);
+-                }
+-            }
+-
+-
+-            // 1. Upload Base64 image to Firebase Storage
+-
+-            const filename = `hazards/${Date.now()}.png`;
+-            const storageRef = ref(storage, filename);
+-            const uploadTask = uploadString(storageRef, imageBase64, 'data_url');
+-            const timeoutPromise = new Promise((_, reject) => 
+-                setTimeout(() => reject(new Error("Firebase Storage Upload Timeout")), 45000)
+-            );
+-
+-            await Promise.race([uploadTask, timeoutPromise]);
+-            const imageUrl = await getDownloadURL(storageRef);
+-
+-            // 2. Snap to Road Precision
+-            const OLA_MAPS_API_KEY = "ZTQwHjxak23hMQ4ewtLTUzwMX9l6lJta0bL2uYv6";
+-            let snappedLoc = { lat, lng };
+-            try {
+-                const snapRes = await fetch(`https://api.olamaps.io/routing/v1/snapToRoad?points=${lat},${lng}&api_key=${OLA_MAPS_API_KEY}`);
+-                const snapData = await snapRes.json();
+-                if (snapData.snapped_points?.[0]) {
+-                    snappedLoc = snapData.snapped_points[0].location;
+-                }
+-            } catch (err) {
+-                console.warn("SnapToRoad failed:", err);
++            let imageUrl = '';
++            if (hazardData.image) {
++                const storagePath = `hazards/${Date.now()}.png`;
++                const storageRef = ref(storage, storagePath);
++                await uploadString(storageRef, hazardData.image, 'data_url');
++                imageUrl = await getDownloadURL(storageRef);
+             }
+ 
+-            // 3. Duplicate Detection Logic (50m radius)
+-            let duplicateDoc = null;
+-            const now = new Date();
+-            
+-            // Search existing hazards of the same type
+-            hazards.forEach(h => {
+-                if (h.type === type && !h.resolved) {
+-                    const from = turf.point([snappedLoc.lng, snappedLoc.lat]);
+-                    const to = turf.point([h.lng, h.lat]);
+-                    const distance = turf.distance(from, to, { units: 'kilometers' });
+-                    
+-                    if (distance <= 0.05) { // 50 meters
+-                        duplicateDoc = h;
+-                    }
+-                }
+-            });
+-
+-            if (duplicateDoc && duplicateDoc.id) {
+-                // Update existing hazard
+-                const docRef = doc(db, "hazards", duplicateDoc.id);
+-                const updatedHazard = {
+-                    reportCount: (duplicateDoc.reportCount || 1) + 1,
+-                    lastReported: serverTimestamp(),
+-                    verification_status: verificationStatus,
+-                    // If current status is resolved but new report comes in, reactivate it? 
+-                    // Usually we don't merge into resolved ones (filtered above)
+-                };
+-                await updateDoc(docRef, updatedHazard);
+-                console.log("🔄 Duplicate detected. Incremented report count for:", duplicateDoc.id);
+-                setSuccessData({ ...duplicateDoc, ...updatedHazard, image: imageBase64 });
+-            } else {
+-                // Create new hazard
+-                const newHazard = {
+-                    type,
+-                    lat: snappedLoc.lat,
+-                    lng: snappedLoc.lng,
+-                    address: address, // From reverse geocoding
+-                    image: imageUrl,
+-                    reportCount: 1,
+-                    status: 'Pending', // Initial municipal status
+-                    verification_status: verificationStatus,
+-                    resolved: false,
+-                    timestamp: serverTimestamp(),
+-                    lastReported: serverTimestamp(),
+-                    confidence: confidence || 1.0,
+-                    reporter_id: user?.id
+-                };
+-
+-                
+-                await addDoc(collection(db, "hazards"), newHazard);
+-                setSuccessData({ ...newHazard, image: imageBase64 });
+-            }
++            const docData = {
++                type: hazardData.type,
++                lat: hazardData.lat,
++                lng: hazardData.lng,
++                image: imageUrl,
++                confidence: hazardData.confidence || 0.85,
++                timestamp: serverTimestamp(),
++                userId: user.uid,
++                reporterName: user.displayName || 'Anonymous',
++                resolved: false
++            };
++
++            await addDoc(collection(db, 'hazards'), docData);
++            setSuccessData(docData);
++            setCurrentScreen('home');
+         } catch (error) {
+             console.error("Firebase submit error:", error);
+-            alert(`Error: ${error.message}`);
++            alert("Error reporting hazard: " + error.message);
+         } finally {
+             setIsUploading(false);
+         }
+     };
+ 
+-    const handleSuccessDone = () => {
+-        setSuccessData(null);
+-        navigateTo('map');
+-    };
+-
+-    return (
+-        <main id="app">
+-            <SuccessOverlay visible={!!successData} hazardData={successData} onDone={handleSuccessDone} />
+-            
+-            {/* Global Uploading Overlay */}
+-            {isUploading && (
+-                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+-                    <div style={{ width: '60px', height: '60px', border: '5px solid rgba(255,255,255,0.1)', borderTopColor: '#4ade80', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+-                    <span style={{ color: 'white', marginTop: '1.5rem', fontWeight: 600, fontSize: '1.1rem', letterSpacing: '0.05em' }}>Syncing Hazard to Cloud...</span>
+-                    <span style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem', fontSize: '0.85rem' }}>Uploading Image & GeoData</span>
+-                </div>
+-            )}
++    if (!isAuthLoaded) {
++        return (
++            <div className="fixed inset-0 bg-[#0d1b3e] flex items-center justify-center">
++                 <div className="w-12 h-12 border-4 border-white/10 border-t-blue-500 rounded-full animate-spin"></div>
++            </div>
++        );
++    }
++
++    // Determine the active display
++    const renderContent = () => {
++        // 1. If we are on 'hero', always show hero (public)
++        if (currentScreen === 'hero') {
++            return (
++                <HeroSection 
++                    onGetStarted={() => {
++                        if (user) navigateTo('home');
++                        else navigateTo('login');
++                    }} 
++                    onMenuClick={toggleSidebar}
++                    isSidebarOpen={isSidebarOpen}
++                />
++            );
++        }
+ 
+-            <SignedOut>
+-                {currentScreen === 'hero' ? (
+-                    <HeroSection 
+-                        onGetStarted={() => navigateTo('login')} 
+-                        onMenuClick={() => navigateTo('login')}
+-                    />
++        // 2. If user is NOT logged in and tries to access something else, show login
++        if (!user || currentScreen === 'login') {
++            return <LoginScreen onBack={() => navigateTo('hero')} />;
++        }
+ 
+-                ) : (
+-                    <LoginScreen onBack={() => navigateTo('hero')} />
+-                )}
+-            </SignedOut>
+-            <SignedIn>
+-                <Sidebar
+-                    isOpen={isSidebarOpen}
+-                    toggleSidebar={toggleSidebar}
+-                    navigateTo={navigateTo}
++        // 3. User is logged in, show requested screen
++        return (
++            <>
++                <Sidebar 
++                    isOpen={isSidebarOpen} 
++                    toggleSidebar={toggleSidebar} 
++                    navigateTo={navigateTo} 
+                 />
+ 
+-                {currentScreen === 'hero' ? (
+-                    <HeroSection 
+-                        onGetStarted={() => navigateTo('home')} 
+-                        onMenuClick={toggleSidebar}
++                <main className="relative w-full h-full transition-transform duration-300">
++                    <HomeScreen
++                        isActive={currentScreen === 'home'}
++                        navigateTo={navigateTo}
++                        hazards={hazards}
+                     />
+-                ) : (
+-                    <>
+-                        <HomeScreen
+-                            isActive={currentScreen === 'home'}
+-                            toggleSidebar={toggleSidebar}
+-                            navigateTo={navigateTo}
+-                        />
+-
+-                        <ReportScreen
+-                            isActive={currentScreen === 'report'}
+-                            navigateTo={navigateTo}
+-                            currentUserLocation={userLocation}
+-                            onSubmit={submitReport}
+-                        />
+-
+-
+-                        <MapScreen
+-                            isActive={currentScreen === 'map'}
+-                            toggleSidebar={toggleSidebar}
+-                            currentUserLocation={userLocation}
+-                            hazards={hazards}
+-                        />
+-
+-                        <DashboardScreen
+-                            isActive={currentScreen === 'dashboard'}
+-                            navigateTo={navigateTo}
+-                            hazards={hazards.filter(h => h.reporter_id === user?.id)}
+-                        />
++                    <ReportScreen
++                        isActive={currentScreen === 'report'}
++                        submitReport={submitReport}
++                        isUploading={isUploading}
++                    />
++                    <MapScreen
++                        isActive={currentScreen === 'map'}
++                        hazards={hazards}
++                        toggleSidebar={toggleSidebar}
++                    />
++                    <DashboardScreen
++                        isActive={currentScreen === 'dashboard'}
++                        hazards={hazards}
++                        navigateTo={navigateTo}
++                    />
++                </main>
+ 
+-                    </>
++                {successData && (
++                    <SuccessOverlay 
++                        data={successData} 
++                        onClose={() => setSuccessData(null)} 
++                    />
+                 )}
+-            </SignedIn>
+-        </main>
++            </>
++        );
++    };
++
++    return (
++        <div className={`relative w-full ${currentScreen === 'hero' ? 'min-h-screen' : 'h-screen overflow-hidden'} bg-bg-gradient shadow-2xl`}>
++            {renderContent()}
++        </div>
+     );
+ }
+ 
+diff --git a/src/components/DashboardScreen.jsx b/src/components/DashboardScreen.jsx
+index 94511368..3675e139 100644
+--- a/src/components/DashboardScreen.jsx
++++ b/src/components/DashboardScreen.jsx
+@@ -29,185 +29,234 @@ const DashboardScreen = ({ isActive, navigateTo, hazards }) => {
+         avgConf: avgConfidence
+     };
+ 
+-    const handleFleetUpload = async (e) => {
+-        const file = e.target.files[0];
+-        if (!file) return;
+-
+-        const formData = new FormData();
+-        formData.append('input', file);
+-
+-        try {
+-            const OLA_MAPS_API_KEY = "ZTQwHjxak23hMQ4ewtLTUzwMX9l6lJta0bL2uYv6"; // Hardcoded for this demo context
+-            const res = await fetch(`https://api.olamaps.io/routing/v1/fleetPlanner?strategy=optimal&api_key=${OLA_MAPS_API_KEY}`, {
+-                method: 'POST',
+-                body: formData,
+-                headers: { 'X-Request-Id': `fleet-${Date.now()}` }
+-            });
+-            const data = await res.json();
+-            if (data.total_distance_travelled_in_KMs) {
+-                alert(`Fleet Optimized! Total distance: ${data.total_distance_travelled_in_KMs} KM for ${data.vehicles?.length || 0} vehicles.`);
+-            } else {
+-                alert("Fleet data processed. Check console for assignments.");
+-            }
+-        } catch (err) {
+-            console.error("Fleet Planner Error:", err);
+-            alert("Error calling Fleet API. Ensure JSON format is valid.");
+-        }
+-    };
+-
+     return (
+-        <section className="absolute inset-0 flex flex-col bg-bg-gradient z-10 animate-fade-in overflow-hidden">
+-            {/* Header */}
+-            <div className="flex items-center justify-between p-6">
+-                <div className="flex items-center gap-4">
++        <section className="absolute inset-0 flex flex-col bg-[#020617] z-10 animate-fade-in overflow-hidden">
++            {/* Ambient Background Glows */}
++            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px] pointer-events-none"></div>
++            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[140px] pointer-events-none"></div>
++
++            {/* Header / Top Bar */}
++            <div className="relative z-20 flex items-center justify-between px-8 py-6 backdrop-blur-md border-b border-white/5 bg-slate-950/20">
++                <div className="flex items-center gap-6">
+                     <button
+-                        className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
++                        className="group w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all border border-white/5 hover:border-white/20 active:scale-95 shadow-2xl"
+                         onClick={() => navigateTo('home')}
+                     >
+-                        <span className="material-icons-round text-white">arrow_back</span>
++                        <span className="material-icons-round text-slate-400 group-hover:text-white transition-colors">arrow_back</span>
+                     </button>
+-                    <h2 className="text-2xl font-bold text-white">Hazard Dashboard</h2>
+-                </div>
+-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full">
+-                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+-                    <span className="text-sm font-medium">Live Updates</span>
+-                </div>
+-            </div>
+-
+-            {/* Stats Cards */}
+-            <div className="grid grid-cols-3 gap-4 px-6 mb-6">
+-                <div className="glass-panel p-4 rounded-2xl flex flex-col items-center">
+-                    <span className="text-3xl font-bold text-white">{stats.total}</span>
+-                    <span className="text-xs text-gray-300 uppercase tracking-wider">Reports</span>
+-                </div>
+-                <div className="glass-panel p-4 rounded-2xl flex flex-col items-center border-l-4 border-l-orange-500">
+-                    <span className="text-3xl font-bold text-white">{stats.active}</span>
+-                    <span className="text-xs text-gray-300 uppercase tracking-wider">Warning</span>
++                    <div>
++                        <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
++                            Account Dashboard
++                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2.5 py-1 rounded-full border border-blue-500/30 uppercase tracking-[0.2em] font-black">Secure</span>
++                        </h2>
++                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Municipal Safety Node // v3.2.0</p>
++                    </div>
+                 </div>
+-                <div className="glass-panel p-4 rounded-2xl flex flex-col items-center border-l-4 border-l-cyan-500">
+-                    <span className="text-3xl font-bold text-white">{stats.avgConf}%</span>
+-                    <span className="text-xs text-gray-300 uppercase tracking-wider">AI Confidence</span>
++                
++                <div className="hidden md:flex items-center gap-4">
++                     <div className="flex flex-col items-end">
++                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Status</span>
++                         <span className="text-xs font-bold text-green-400 flex items-center gap-1.5 mt-1">
++                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
++                             Real-time Monitoring Active
++                         </span>
++                     </div>
+                 </div>
+             </div>
+ 
+-            {/* AI Insights & Fleet Header */}
+-            <div className="px-6 mb-6">
+-                <div className="glass-panel p-5 rounded-3xl bg-linear-to-br from-white/5 to-white/2">
+-                    <div className="flex items-center justify-between mb-4">
+-                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+-                           <span className="material-icons-round text-blue-400 text-sm">analytics</span>
+-                           Hazard Distribution
+-                        </h3>
+-                        <div className="flex items-center gap-3">
+-                            <label className="cursor-pointer bg-white/10 hover:bg-white/20 text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/20 transition-all flex items-center gap-1.5">
+-                                <span className="material-icons-round text-[12px]">local_shipping</span>
+-                                Fleet Plan
+-                                <input type="file" accept=".json" onChange={handleFleetUpload} className="hidden" />
+-                            </label>
+-                            <span className="text-[10px] text-gray-500 font-mono italic">AI-Processed</span>
++            <div className="relative z-20 flex-1 overflow-y-auto px-8 py-8 space-y-8 custom-scrollbar">
++                
++                {/* Main Intel Grid */}
++                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
++                    {/* Primary Stats */}
++                    <div className="grid grid-cols-2 md:grid-cols-1 gap-4 md:col-span-1">
++                        <div className="bg-slate-900/40 backdrop-blur-xl p-6 rounded-[32px] border border-white/5 shadow-2xl space-y-2 group hover:bg-slate-900/60 transition-all duration-500">
++                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Reports</span>
++                             <div className="flex items-baseline gap-2">
++                                 <span className="text-4xl font-black text-white">{stats.total}</span>
++                                 <span className="text-xs font-bold text-slate-600">UNITS</span>
++                             </div>
++                             <div className="w-12 h-1 bg-white/10 rounded-full group-hover:bg-white/20 transition-all"></div>
++                        </div>
++                        <div className="bg-slate-900/40 backdrop-blur-xl p-6 rounded-[32px] border border-white/5 shadow-2xl space-y-2 group hover:bg-slate-900/60 transition-all duration-500">
++                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pending</span>
++                             <div className="flex items-baseline gap-2">
++                                 <span className="text-4xl font-black text-orange-500 pr-1">{stats.active}</span>
++                             </div>
++                             <div className="w-12 h-1 bg-orange-500/20 rounded-full group-hover:bg-orange-500/40 transition-all"></div>
+                         </div>
+                     </div>
+-                    
+-                    <div className="space-y-4">
+-                        {sortedTypes.map(([type, count], i) => {
+-                            const percent = (count / (hazards.length || 1) * 100).toFixed(0);
+-                            return (
+-                                <div key={i} className="group">
+-                                    <div className="flex justify-between items-end mb-1.5">
+-                                        <span className="text-sm font-medium text-gray-200 truncate pr-4">{type}</span>
+-                                        <span className="text-xs font-bold text-gray-400">{percent}%</span>
+-                                    </div>
+-                                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+-                                        <div 
+-                                            className="h-full bg-linear-to-r from-blue-500 to-cyan-400 transition-all duration-1000 ease-out"
+-                                            style={{ width: `${percent}%`, transitionDelay: `${i * 150}ms` }}
+-                                        />
++
++                    {/* AI Distribution Chart Card */}
++                    <div className="md:col-span-2 bg-linear-to-br from-slate-900/60 to-slate-950/60 backdrop-blur-2xl p-8 rounded-[40px] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] flex flex-col">
++                        <div className="flex items-center justify-between mb-8">
++                             <div>
++                                 <h3 className="text-sm font-bold text-white uppercase tracking-widest">Incident Intelligence</h3>
++                                 <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Cross-referenced via Clip-ViT-B/32</p>
++                             </div>
++                             <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
++                                 <span className="material-icons-round text-blue-500 text-lg">psychology</span>
++                             </div>
++                        </div>
++
++                        <div className="flex-1 space-y-6">
++                            {sortedTypes.length > 0 ? sortedTypes.map(([type, count], i) => {
++                                const percent = (count / (hazards.length || 1) * 100).toFixed(0);
++                                return (
++                                    <div key={i} className="group cursor-default">
++                                        <div className="flex justify-between items-end mb-2 px-1">
++                                            <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">{type}</span>
++                                            <span className="text-[10px] font-black text-slate-500">{percent}%</span>
++                                        </div>
++                                        <div className="relative h-2 w-full bg-white/5 rounded-full overflow-hidden p-[1.5px] border border-white/5">
++                                            <div 
++                                                className="h-full bg-linear-to-r from-blue-600 via-cyan-400 to-blue-400 rounded-full shadow-[0_0_12px_rgba(37,99,235,0.4)] transition-all duration-[1.5s] ease-out-expo"
++                                                style={{ width: `${percent}%`, transitionDelay: `${i * 100}ms` }}
++                                            />
++                                        </div>
+                                     </div>
++                                );
++                            }) : (
++                                <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/5 rounded-3xl opacity-30">
++                                     <span className="text-xs font-black uppercase tracking-widest text-slate-500">Awaiting Telemetry Data</span>
+                                 </div>
+-                            );
+-                        })}
++                            )}
++                        </div>
+                     </div>
+-                </div>
+-            </div>
+ 
+-            {/* Hazards List */}
+-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
+-                <h3 className="text-lg font-semibold text-gray-200 sticky top-0 bg-transparent backdrop-blur-md py-2 z-10">Recent Reports</h3>
++                    {/* Confidence Meter Card */}
++                    <div className="bg-slate-900/40 backdrop-blur-xl p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col items-center justify-center space-y-4 text-center">
++                         <div className="relative w-32 h-32 flex items-center justify-center">
++                             {/* Circular SVG Progress */}
++                             <svg className="absolute inset-0 w-full h-full -rotate-90">
++                                 <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/5" />
++                                 <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 
++                                    className="text-cyan-500 transition-all duration-[2s] ease-out-expo"
++                                    strokeDasharray="364"
++                                    strokeDashoffset={364 - (364 * stats.avgConf) / 100}
++                                    strokeLinecap="round"
++                                 />
++                             </svg>
++                             <div className="text-center">
++                                 <span className="text-3xl font-black text-white leading-none">{stats.avgConf}<span className="text-xs">%</span></span>
++                                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Accuracy</p>
++                             </div>
++                         </div>
++                         <div className="space-y-1">
++                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Confidence</h4>
++                             <p className="text-[9px] text-slate-500 leading-relaxed italic px-4">Automatic verification of all municipal hazards via cloud-based AI nodes.</p>
++                         </div>
++                    </div>
++                </div>
+ 
+-                {hazards.length === 0 ? (
+-                    <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+-                        <span className="material-icons-round text-4xl mb-2">check_circle</span>
+-                        <p>No hazards reported yet.</p>
++                {/* Detailed Logs Section */}
++                <div className="space-y-6">
++                    <div className="flex items-center justify-between">
++                        <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-3">
++                            Telemetry Logs
++                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
++                        </h3>
++                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
++                            <span className="material-icons-round text-slate-500 text-sm">history</span>
++                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Last 24 Hours</span>
++                        </div>
+                     </div>
+-                ) : (
+-                    hazards.map((hazard, index) => (
+-                        <div key={index} className="glass-panel p-4 rounded-2xl flex items-center gap-4 hover:bg-white/10 transition-colors animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+-                            <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden shrink-0 border border-white/10">
+-                                {hazard.image ? (
+-                                    <img src={hazard.image} alt={hazard.type} className="w-full h-full object-cover" />
+-                                ) : (
+-                                    <div className="w-full h-full flex items-center justify-center">
+-                                        <span className="material-icons-round text-gray-500">image_not_supported</span>
+-                                    </div>
+-                                )}
+-                            </div>
+ 
+-                            <div className="flex-1 min-w-0">
+-                                <div className="flex flex-col mb-1">
+-                                    <h4 className={`font-bold truncate ${hazard.resolved ? 'text-gray-400 line-through' : 'text-white'}`}>{hazard.type}</h4>
+-                                    <div className="mt-1 flex items-center gap-2">
+-                                        {hazard.resolved ? (
+-                                            <span className="text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded font-bold uppercase border border-green-500/30 flex items-center gap-1 w-fit">
+-                                                <span className="material-icons-round text-[10px]">check_circle</span>
+-                                                Resolved
+-                                            </span>
++                    {hazards.length === 0 ? (
++                        <div className="flex flex-col items-center justify-center py-20 px-10 glass-panel rounded-[40px] text-center space-y-4 bg-slate-950/40">
++                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-slate-500 border border-white/10">
++                                <span className="material-icons-round text-3xl">inbox</span>
++                            </div>
++                            <div>
++                                <h4 className="text-sm font-bold text-white">No Active Hazards</h4>
++                                <p className="text-xs text-slate-500 mt-1 max-w-xs">Your personal telemetry stream is currently clear. Any reports you submit will appear here in real-time.</p>
++                            </div>
++                        </div>
++                    ) : (
++                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                            {hazards.map((hazard, index) => (
++                                <div 
++                                    key={index} 
++                                    className="group relative bg-slate-900/40 backdrop-blur-xl p-5 rounded-[32px] border border-white/5 shadow-2xl flex items-center gap-5 hover:bg-slate-900/70 transition-all hover:translate-y-[-4px] hover:border-white/10 duration-300" 
++                                    style={{ animationDelay: `${index * 0.1}s` }}
++                                >
++                                    {/* Hazard Visual Element */}
++                                    <div className="relative w-20 h-20 rounded-2xl bg-slate-800 overflow-hidden shrink-0 border border-white/10 group-hover:border-blue-500/30 transition-all">
++                                        <div className="absolute inset-0 bg-blue-600/10 mix-blend-overlay z-10"></div>
++                                        {hazard.image ? (
++                                            <img src={hazard.image} alt={hazard.type} className="w-full h-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all scale-110 group-hover:scale-100" />
+                                         ) : (
+-                                            <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-bold uppercase border border-red-500/30 w-fit">
+-                                                High Priority
+-                                            </span>
++                                            <div className="w-full h-full flex items-center justify-center bg-slate-800">
++                                                <span className="material-icons-round text-slate-600">satellite_alt</span>
++                                            </div>
+                                         )}
++                                        {/* Corner Notch */}
++                                        <div className="absolute top-0 left-0 w-4 h-4 bg-slate-900 -translate-x-1/2 -translate-y-1/2 rotate-45 z-20"></div>
+                                     </div>
+-                                </div>
+-                                <p className="text-xs text-gray-300 flex items-center gap-1 mt-2">
+-                                    <span className="material-icons-round text-[12px]">location_on</span>
+-                                    {hazard.lat?.toFixed(4) || 0}, {hazard.lng?.toFixed(4) || 0}
+-                                </p>
+-                                <p className="text-[10px] text-gray-400 mt-1">
+-                                    Sync: Cloud Database
+-                                </p>
+-                            </div>
+ 
+-                            <div className="flex flex-col items-end gap-2 pr-2">
+-                                {!hazard.resolved && hazard.id && (
+-                                    <button 
+-                                        className="px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/30 text-green-400 text-xs font-bold transition-all border border-green-500/30 shadow-lg"
+-                                        onClick={async () => {
+-                                            try {
+-                                                const docRef = doc(db, 'hazards', hazard.id);
+-                                                await updateDoc(docRef, { resolved: true });
+-                                            } catch (error) {
+-                                                console.error("Failed to mark resolved", error);
+-                                                alert("Error updating status via Firebase. Check console.");
+-                                            }
+-                                        }}
+-                                    >
+-                                        Mark Fixed
+-                                    </button>
+-                                )}
+-                                <button 
+-                                    className="p-2 rounded-full bg-white/5 hover:bg-white/20 text-gray-300 hover:text-white transition-colors flex items-center justify-center w-8 h-8" 
+-                                    title="View on Map" 
+-                                    onClick={() => navigateTo('map')}
+-                                >
+-                                    <span className="material-icons-round text-sm">chevron_right</span>
+-                                </button>
+-                            </div>
++                                    <div className="flex-1 min-w-0 pr-2">
++                                        <div className="flex flex-col">
++                                            <div className="flex items-center gap-2 mb-1.5">
++                                                <span className={`w-1.5 h-1.5 rounded-full ${hazard.resolved ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
++                                                <h4 className={`text-sm font-black tracking-tight truncate ${hazard.resolved ? 'text-slate-500 decoration-slate-600/50' : 'text-white'}`}>
++                                                    {hazard.type}
++                                                </h4>
++                                            </div>
++                                            
++                                            <div className="flex flex-wrap gap-2">
++                                                {hazard.resolved ? (
++                                                    <span className="text-[9px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-md font-black uppercase border border-green-500/20">Resolved</span>
++                                                ) : (
++                                                    <span className="text-[9px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-md font-black uppercase border border-red-500/20">Active Internal Warning</span>
++                                                )}
++                                                <span className="text-[9px] bg-white/5 text-slate-500 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest border border-white/5">Local Node</span>
++                                            </div>
++                                        </div>
++
++                                        <p className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-3 font-mono">
++                                            <span className="material-icons-round text-[12px] text-slate-600">gps_fixed</span>
++                                            {hazard.lat?.toFixed(5)}, {hazard.lng?.toFixed(5)}
++                                        </p>
++                                    </div>
++
++                                    {/* Action Hub */}
++                                    <div className="flex flex-col items-end gap-3">
++                                        <button 
++                                            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-blue-500/20 text-slate-500 hover:text-blue-400 transition-all border border-white/5 hover:border-blue-500/30 flex items-center justify-center group/btn"
++                                            title="Inspect Telemetry" 
++                                            onClick={() => navigateTo('map')}
++                                        >
++                                            <span className="material-icons-round text-base group-hover/btn:translate-x-0.5 transition-transform">analytics</span>
++                                        </button>
++                                        
++                                        {!hazard.resolved && hazard.id && (
++                                            <button 
++                                                className="px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-wider transition-all border border-green-500/20 hover:scale-105 active:scale-95 whitespace-nowrap"
++                                                onClick={async () => {
++                                                    try {
++                                                        const docRef = doc(db, 'hazards', hazard.id);
++                                                        await updateDoc(docRef, { resolved: true });
++                                                    } catch (error) {
++                                                        console.error("Failed to mark resolved", error);
++                                                    }
++                                                }}
++                                            >
++                                                Fix Case
++                                            </button>
++                                        )}
++                                    </div>
++                                </div>
++                            ))}
+                         </div>
+-                    ))
+-                )}
++                    )}
++                </div>
+             </div>
++
++            {/* Bottom Accent Line */}
++            <div className="h-1.5 w-full bg-linear-to-r from-blue-600 via-cyan-400 to-transparent opacity-50 shrink-0"></div>
+         </section>
+     );
+ };
+ 
+ export default DashboardScreen;
++
+diff --git a/src/components/HeroSection.css b/src/components/HeroSection.css
+index 9339e85c..b5886be5 100644
+--- a/src/components/HeroSection.css
++++ b/src/components/HeroSection.css
+@@ -89,17 +89,25 @@
+ }
+ 
+ .hero-subtitle {
+-  font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+-  opacity: 0.9;
+-  max-width: 600px;
++  font-size: clamp(1rem, 2vw, 1.4rem);
++  opacity: 1;
++  max-width: 800px;
+   margin: 0 auto;
+   color: #fff;
++  text-shadow: 
++    0 2px 4px rgba(0,0,0,0.8),
++    0 4px 10px rgba(0,0,0,0.4);
++  font-weight: 700;
++  letter-spacing: 0.02em;
++  position: relative;
++  z-index: 20;
+ }
+ 
+ .subtitle-line {
+   display: block;
+-  overflow: hidden;
+-  margin-bottom: 0.5rem;
++  overflow: visible;
++  margin-bottom: 0.75rem;
++  line-height: 1.4;
+ }
+ 
+ .hero-content button {
+diff --git a/src/components/HeroSection.jsx b/src/components/HeroSection.jsx
+index 87060065..a0930c45 100644
+--- a/src/components/HeroSection.jsx
++++ b/src/components/HeroSection.jsx
+@@ -10,7 +10,7 @@ import './HeroSection.css';
+ 
+ gsap.registerPlugin(ScrollTrigger);
+ 
+-const HeroSection = ({ onGetStarted, onMenuClick }) => {
++const HeroSection = ({ onGetStarted, onMenuClick, isSidebarOpen }) => {
+   const containerRef = useRef(null);
+   const canvasRef = useRef(null);
+   const titleRef = useRef(null);
+@@ -19,12 +19,11 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+   const menuRef = useRef(null);
+ 
+   const smoothCameraPos = useRef({ x: 0, y: 30, z: 100 });
+-  const cameraVelocity = useRef({ x: 0, y: 0, z: 0 });
+   
+   const [scrollProgress, setScrollProgress] = useState(0);
+-  const [currentSection, setCurrentSection] = useState(1);
++  const [currentSection, setCurrentSection] = useState(0);
+   const [isReady, setIsReady] = useState(false);
+-  const totalSections = 2;
++  const totalSections = 2; // Intervals for 3 sections (0, 1, 2)
+   
+   const threeRefs = useRef({
+     scene: null,
+@@ -34,7 +33,11 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+     stars: [],
+     nebula: null,
+     mountains: [],
+-    animationId: null
++    animationId: null,
++    targetCameraX: 0,
++    targetCameraY: 30,
++    targetCameraZ: 300,
++    locations: []
+   });
+ 
+   // Initialize Three.js
+@@ -53,8 +56,8 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+         0.1,
+         2000
+       );
+-      refs.camera.position.z = 100;
+-      refs.camera.position.y = 20;
++      refs.camera.position.z = 300;
++      refs.camera.position.y = 30;
+ 
+       // Renderer
+       refs.renderer = new THREE.WebGLRenderer({
+@@ -85,7 +88,9 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+       createNebula();
+       createMountains();
+       createAtmosphere();
+-      getLocation();
++      
++      // Get initial positions for mountains
++      refs.locations = refs.mountains.map(m => m.position.z);
+ 
+       // Start animation
+       animate();
+@@ -119,7 +124,7 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+           if (colorChoice < 0.7) {
+             color.setHSL(0, 0, 0.8 + Math.random() * 0.2);
+           } else if (colorChoice < 0.9) {
+-            color.setHSL(0.05, 0.8, 0.7); // Warmer for RoadHazeX
++            color.setHSL(0.08, 0.5, 0.8);
+           } else {
+             color.setHSL(0.6, 0.5, 0.8);
+           }
+@@ -151,7 +156,6 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+               vColor = color;
+               vec3 pos = position;
+               
+-              // Slow rotation based on depth
+               float angle = time * 0.05 * (1.0 - depth * 0.3);
+               mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+               pos.xy = rot * pos.xy;
+@@ -177,9 +181,9 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+           depthWrite: false
+         });
+ 
+-        const stars = new THREE.Points(geometry, material);
+-        refs.scene.add(stars);
+-        refs.stars.push(stars);
++        const starSet = new THREE.Points(geometry, material);
++        refs.scene.add(starSet);
++        refs.stars.push(starSet);
+       }
+     };
+ 
+@@ -190,8 +194,8 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+       const material = new THREE.ShaderMaterial({
+         uniforms: {
+           time: { value: 0 },
+-          color1: { value: new THREE.Color(0xff6b6b) }, // Match RoadHazeX color
+-          color2: { value: new THREE.Color(0x1e3c72) }, // Match RoadHazeX color
++          color1: { value: new THREE.Color(0xff6b6b) }, // Red highlight
++          color2: { value: new THREE.Color(0x1e3c72) }, // Deep blue
+           opacity: { value: 0.3 }
+         },
+         vertexShader: `
+@@ -234,11 +238,10 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+         depthWrite: false
+       });
+ 
+-      const nebula = new THREE.Mesh(geometry, material);
+-      nebula.position.z = -1050;
+-      nebula.rotation.x = 0;
+-      refs.scene.add(nebula);
+-      refs.nebula = nebula;
++      const nebulaMesh = new THREE.Mesh(geometry, material);
++      nebulaMesh.position.z = -1050;
++      refs.scene.add(nebulaMesh);
++      refs.nebula = nebulaMesh;
+     };
+ 
+     const createMountains = () => {
+@@ -256,15 +259,15 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+         const segments = 50;
+         
+         for (let i = 0; i <= segments; i++) {
+-          const x = (i / segments - 0.5) * 1000;
++          const x = (i / segments - 0.5) * 2000;
+           const y = Math.sin(i * 0.1) * layer.height + 
+                    Math.sin(i * 0.05) * layer.height * 0.5 +
+                    Math.random() * layer.height * 0.2 - 100;
+           points.push(new THREE.Vector2(x, y));
+         }
+         
+-        points.push(new THREE.Vector2(5000, -300));
+-        points.push(new THREE.Vector2(-5000, -300));
++        points.push(new THREE.Vector2(5000, -500));
++        points.push(new THREE.Vector2(-5000, -500));
+ 
+         const shape = new THREE.Shape(points);
+         const geometry = new THREE.ShapeGeometry(shape);
+@@ -277,7 +280,6 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+ 
+         const mountain = new THREE.Mesh(geometry, material);
+         mountain.position.z = layer.distance;
+-        mountain.position.y = layer.distance
+         mountain.userData = { baseZ: layer.distance, index };
+         refs.scene.add(mountain);
+         refs.mountains.push(mountain);
+@@ -286,34 +288,24 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+ 
+     const createAtmosphere = () => {
+       const { current: refs } = threeRefs;
+-      
+       const geometry = new THREE.SphereGeometry(600, 32, 32);
+       const material = new THREE.ShaderMaterial({
+-        uniforms: {
+-          time: { value: 0 }
+-        },
++        uniforms: { time: { value: 0 } },
+         vertexShader: `
+           varying vec3 vNormal;
+-          varying vec3 vPosition;
+-          
+           void main() {
+             vNormal = normalize(normalMatrix * normal);
+-            vPosition = position;
+             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+           }
+         `,
+         fragmentShader: `
+           varying vec3 vNormal;
+-          varying vec3 vPosition;
+           uniform float time;
+-          
+           void main() {
+             float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+             vec3 atmosphere = vec3(0.3, 0.6, 1.0) * intensity;
+-            
+             float pulse = sin(time * 2.0) * 0.1 + 0.9;
+             atmosphere *= pulse;
+-            
+             gl_FragColor = vec4(atmosphere, intensity * 0.25);
+           }
+         `,
+@@ -332,53 +324,39 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+       
+       const time = Date.now() * 0.001;
+ 
+-      // Update stars
+-      refs.stars.forEach((starField, i) => {
+-        if (starField.material.uniforms) {
+-          starField.material.uniforms.time.value = time;
+-        }
++      refs.stars.forEach(starSet => {
++        if (starSet.material.uniforms) starSet.material.uniforms.time.value = time;
+       });
+ 
+-      // Update nebula
+       if (refs.nebula && refs.nebula.material.uniforms) {
+         refs.nebula.material.uniforms.time.value = time * 0.5;
+       }
+ 
+-      // Smooth camera movement with easing
+-      if (refs.camera && refs.targetCameraX !== undefined) {
+-        const smoothingFactor = 0.05; // Lower = smoother but slower
+-        
+-        // Calculate smooth position with easing
++      if (refs.camera) {
++        const smoothingFactor = 0.05;
+         smoothCameraPos.current.x += (refs.targetCameraX - smoothCameraPos.current.x) * smoothingFactor;
+         smoothCameraPos.current.y += (refs.targetCameraY - smoothCameraPos.current.y) * smoothingFactor;
+         smoothCameraPos.current.z += (refs.targetCameraZ - smoothCameraPos.current.z) * smoothingFactor;
+         
+-        // Add subtle floating motion
+         const floatX = Math.sin(time * 0.1) * 2;
+         const floatY = Math.cos(time * 0.15) * 1;
+         
+-        // Apply final position
+         refs.camera.position.x = smoothCameraPos.current.x + floatX;
+         refs.camera.position.y = smoothCameraPos.current.y + floatY;
+         refs.camera.position.z = smoothCameraPos.current.z;
+         refs.camera.lookAt(0, 10, -600);
+       }
+ 
+-      // Parallax mountains with subtle animation
+       refs.mountains.forEach((mountain, i) => {
+         const parallaxFactor = 1 + i * 0.5;
+         mountain.position.x = Math.sin(time * 0.1) * 2 * parallaxFactor;
+-        mountain.position.y = 50 + (Math.cos(time * 0.15) * 1 * parallaxFactor);
+       });
+ 
+-      if (refs.composer) {
+-        refs.composer.render();
+-      }
++      if (refs.composer) refs.composer.render();
+     };
+ 
+     initThree();
+ 
+-    // Handle resize
+     const handleResize = () => {
+       const { current: refs } = threeRefs;
+       if (refs.camera && refs.renderer && refs.composer) {
+@@ -390,167 +368,58 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+     };
+ 
+     window.addEventListener('resize', handleResize);
+-
+-    // Cleanup
+     return () => {
+       const { current: refs } = threeRefs;
+-      
+-      if (refs.animationId) {
+-        cancelAnimationFrame(refs.animationId);
+-      }
+-
++      if (refs.animationId) cancelAnimationFrame(refs.animationId);
+       window.removeEventListener('resize', handleResize);
+-
+-      // Dispose Three.js resources
+-      refs.stars.forEach(starField => {
+-        starField.geometry.dispose();
+-        starField.material.dispose();
+-      });
+-
+-      refs.mountains.forEach(mountain => {
+-        mountain.geometry.dispose();
+-        mountain.material.dispose();
+-      });
+-
+-      if (refs.nebula) {
+-        refs.nebula.geometry.dispose();
+-        refs.nebula.material.dispose();
+-      }
+-
+-      if (refs.renderer) {
+-        refs.renderer.dispose();
+-      }
+     };
+   }, []);
+ 
+-  const getLocation = () => {
+-    const { current: refs } = threeRefs;
+-    const locations = [];
+-    refs.mountains.forEach( (mountain, i) => {
+-      locations[i] = mountain.position.z
+-    })
+-    refs.locations = locations
+-  }
+-
+-  // GSAP Animations - Run after component is ready
+-  useEffect(() => {
+-    if (!isReady) return;
+-    
+-    // Set initial states to prevent flash
+-    gsap.set([menuRef.current, titleRef.current, subtitleRef.current, scrollProgressRef.current], {
+-      visibility: 'visible'
+-    });
+-
+-    const tl = gsap.timeline();
+-
+-    // Animate menu
+-    if (menuRef.current) {
+-      tl.from(menuRef.current, {
+-        x: -100,
+-        opacity: 0,
+-        duration: 1,
+-        ease: "power3.out"
+-      });
+-    }
+-
+-    // Animate title with split text
+-    if (titleRef.current) {
+-      const titleChars = titleRef.current.querySelectorAll('.title-char');
+-      tl.from(titleChars, {
+-        y: 200,
+-        opacity: 0,
+-        duration: 1.5,
+-        stagger: 0.05,
+-        ease: "power4.out"
+-      }, "-=0.5");
+-    }
+-
+-    // Animate subtitle lines
+-    if (subtitleRef.current) {
+-      const subtitleLines = subtitleRef.current.querySelectorAll('.subtitle-line');
+-      tl.from(subtitleLines, {
+-        y: 50,
+-        opacity: 0,
+-        duration: 1,
+-        stagger: 0.2,
+-        ease: "power3.out"
+-      }, "-=0.8");
+-    }
+-
+-    // Animate scroll indicator
+-    if (scrollProgressRef.current) {
+-      tl.from(scrollProgressRef.current, {
+-        opacity: 0,
+-        y: 50,
+-        duration: 1,
+-        ease: "power2.out"
+-      }, "-=0.5");
+-    }
+-
+-    return () => {
+-      tl.kill();
+-    };
+-  }, [isReady]);
+-
+   // Scroll handling
+   useEffect(() => {
+     const handleScroll = () => {
+       const scrollY = window.scrollY;
+       const windowHeight = window.innerHeight;
+       const documentHeight = document.documentElement.scrollHeight;
+-      const maxScroll = documentHeight - windowHeight;
++      const maxScroll = Math.max(1, documentHeight - windowHeight);
+       const progress = Math.min(scrollY / maxScroll, 1);
+       
+       setScrollProgress(progress);
+-      const newSection = Math.floor(progress * totalSections);
++      const newSection = Math.min(Math.floor(progress * (totalSections + 0.1)), totalSections);
+       setCurrentSection(newSection);
+ 
+       const { current: refs } = threeRefs;
+-      
+-      // Calculate smooth progress through all sections
+       const totalProgress = progress * totalSections;
+       const sectionProgress = totalProgress % 1;
+       
+-      // Define camera positions for each section
+       const cameraPositions = [
+-        { x: 0, y: 30, z: 300 },    // Section 0 - ROADHAZEX
+-        { x: 0, y: 40, z: -50 },     // Section 1 - PERSPECTIVE
+-        { x: 0, y: 50, z: -700 }       // Section 2 - SAFETY
++        { x: 0, y: 30, z: 300 },    // HORIZON
++        { x: 0, y: 40, z: -50 },     // COSMOS
++        { x: 0, y: 50, z: -700 }      // INFINITY
+       ];
+       
+-      // Get current and next positions
+       const currentPos = cameraPositions[newSection] || cameraPositions[0];
+       const nextPos = cameraPositions[newSection + 1] || currentPos;
+       
+-      // Set target positions (actual smoothing happens in animate loop)
+       refs.targetCameraX = currentPos.x + (nextPos.x - currentPos.x) * sectionProgress;
+       refs.targetCameraY = currentPos.y + (nextPos.y - currentPos.y) * sectionProgress;
+       refs.targetCameraZ = currentPos.z + (nextPos.z - currentPos.z) * sectionProgress;
+-      
+-      // Smooth parallax for mountains
++
+       refs.mountains.forEach((mountain, i) => {
+         const speed = 1 + i * 0.9;
+-        const targetZ = mountain.userData.baseZ + scrollY * speed * 0.5;
+-        if(refs.nebula) refs.nebula.position.z = (targetZ + progress * speed * 0.01) - 100
++        const baseZ = refs.locations[i] || -50;
++        const targetZ = baseZ + scrollY * speed * 0.5;
+         
+-        // Use the same smoothing approach
+-        mountain.userData.targetZ = targetZ;
+-        if (progress > 0.7) {
+-          mountain.position.z = 600000;
+-        }
+-        if (progress < 0.7) {
+-          mountain.position.z = refs.locations[i]
+-        }
++        if (progress > 0.7) mountain.position.z = 600000;
++        else mountain.position.z = targetZ;
+       });
+-      if(refs.nebula && refs.mountains[3]) refs.nebula.position.z = refs.mountains[3].position.z
++      if(refs.nebula && refs.mountains[3]) refs.nebula.position.z = refs.mountains[3].position.z;
+     };
+ 
+     window.addEventListener('scroll', handleScroll);
+-    handleScroll(); // Set initial position
+-    
++    handleScroll();
+     return () => window.removeEventListener('scroll', handleScroll);
+-  }, [totalSections]);
+-
++  }, []);
+ 
+   const splitTitle = (text) => {
+     return text.split('').map((char, i) => (
+@@ -564,83 +433,72 @@ const HeroSection = ({ onGetStarted, onMenuClick }) => {
+     <div ref={containerRef} className="hero-container cosmos-style">
+       <canvas ref={canvasRef} className="hero-canvas" />
+       
+-      {/* Side menu - High Z-index with pointer events */}
++      {/* Side menu linked to Sidebar */}
+       <div 
+         ref={menuRef} 
+         className="side-menu" 
+-        style={{ zIndex: 99999, pointerEvents: 'auto', cursor: 'pointer' }}
+-        onClick={(e) => {
+-           console.log("⚡ Hero Side-Menu DIV Clicked");
+-           onMenuClick?.(e);
++        style={{ 
++            display: isSidebarOpen ? 'none' : 'flex' 
+         }}
++        onClick={onMenuClick}
+       >
+-        <div className="menu-icon" title="Toggle Navigation">
++        <div className="menu-icon">
+           <span></span>
+           <span></span>
+           <span></span>
+         </div>
+-        <div className="vertical-text">ROADHAZEX</div>
++        <div className="vertical-text">SPACE</div>
+       </div>
+ 
+-
++      {/* Main content - Fixed in center */}
++      <div className="hero-content cosmos-content" style={{ opacity: currentSection === 0 ? 1 : 0, transition: 'opacity 0.8s ease-in-out' }}>
++        <h1 className="hero-title">{splitTitle('ROADHAZEX')}</h1>
++        <div className="hero-subtitle cosmos-subtitle">
++          <p className="subtitle-line">Predicting the Path. Preserving the Road.</p>
++          <p className="subtitle-line">Powering the Future of Safe Transit</p>
++          <button 
++            className="mt-12 px-10 py-4 bg-white text-black font-extrabold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-2xl pointer-events-auto cursor-pointer"
++            onClick={onGetStarted}
++            style={{ pointerEvents: 'auto', zIndex: 50 }}
++          >
++            GET STARTED
++          </button>
++        </div>
++      </div>
+ 
+       {/* Scroll indicator */}
+-      <div ref={scrollProgressRef} className="scroll-progress" style={{ visibility: 'hidden' }}>
++      <div ref={scrollProgressRef} className="scroll-progress" style={{ display: isSidebarOpen ? 'none' : 'flex' }}>
+         <div className="scroll-text">SCROLL</div>
+         <div className="progress-track">
+-          <div 
+-            className="progress-fill" 
+-            style={{ width: `${scrollProgress * 100}%` }}
+-          />
++          <div className="progress-fill" style={{ width: `${scrollProgress * 100}%` }} />
+         </div>
+         <div className="section-counter">
+           {String(currentSection).padStart(2, '0')} / {String(totalSections).padStart(2, '0')}
+         </div>
+       </div>
+ 
+-      {/* Main scrolling sections */}
++      {/* Additional sections for scrolling */}
+       <div className="scroll-sections">
+-       {[...Array(3)].map((_, i) => {
+-          const titles = {
+-            0: 'ROADHAZEX',
+-            1: 'PERSPECTIVE',
+-            2: 'SAFETY'
+-          };
+-          
++       {[...Array(totalSections + 1)].map((_, i) => {
++          if (i === 0) return <section key={i} className="content-section h-screen" />; // Main is already handled
++          const titles = { 1: 'AI-DRIVEN', 2: 'SAFE ROADS' };
+           const subtitles = {
+-            0: {
+-              line1: 'Empowering road safety,',
+-              line2: 'through AI-driven detection'
+-            },
+-            1: {
+-              line1: 'Beyond the boundaries of current maps,',
+-              line2: 'lies a smart vision of road integrity'
+-            },
+-            2: {
+-              line1: 'Connecting data with municipal response,',
+-              line2: 'creating a safer path for everyone'
+-            }
++            1: { line1: 'Real-time Infrastructure Monitoring.', line2: 'Identifying Municipal Risks with AI Precision' },
++            2: { line1: 'Bridging the Gap Between Risk and Response.', line2: 'Engineering a World Without Road Hazards' }
+           };
+           
+           return (
+-            <section key={i} className="content-section" style={{ opacity: i === currentSection ? 1 : 0, pointerEvents: i === currentSection ? 'auto' : 'none', transition: 'opacity 0.8s ease-in-out' }}>
++            <section key={i} className="content-section" style={{ opacity: i === currentSection ? 1 : 0, transition: 'opacity 0.8s ease-in-out' }}>
+               <div className="section-inner px-6">
+-                <h1 className="hero-title">
+-                  {splitTitle(titles[i] || 'DEFAULT')}
+-                </h1>
+-            
++                <h1 className="hero-title">{splitTitle(titles[i])}</h1>
+                 <div className="hero-subtitle cosmos-subtitle">
+-                  <p className="subtitle-line">
+-                    {subtitles[i].line1}
+-                  </p>
+-                  <p className="subtitle-line">
+-                    {subtitles[i].line2}
+-                  </p>
++                  <p className="subtitle-line">{subtitles[i].line1}</p>
++                  <p className="subtitle-line">{subtitles[i].line2}</p>
+                   <button 
+-                      className="mt-12 px-10 py-4 bg-white text-black font-bold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-xl"
+-                      onClick={onGetStarted}
++                    className="mt-12 px-10 py-4 bg-white text-black font-extrabold rounded-full hover:bg-red-500 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-2xl pointer-events-auto cursor-pointer"
++                    onClick={onGetStarted}
+                   >
+-                      {i === 0 ? 'Get Started' : 'Enter Platform'}
++                    ENTER HUB
+                   </button>
+                 </div>
+               </div>
+diff --git a/src/components/LoginScreen.jsx b/src/components/LoginScreen.jsx
+index 4aa1a734..d192e15a 100644
+--- a/src/components/LoginScreen.jsx
++++ b/src/components/LoginScreen.jsx
+@@ -1,5 +1,6 @@
+ import React, { useEffect, useRef } from 'react';
+-import { SignIn } from '@clerk/clerk-react';
++import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
++import { auth } from '../firebase';
+ 
+ /* ─── Animated canvas: road & particle effect ─── */
+ function RoadCanvas() {
+@@ -155,18 +156,19 @@ function Badge({ icon, label }) {
+     );
+ }
+ 
+-/* ─── Stat Card ─── */
+-function Stat({ value, label }) {
+-    return (
+-        <div className="flex flex-col items-center">
+-            <span className="text-2xl font-bold" style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{value}</span>
+-            <span className="text-xs text-white/50 mt-0.5">{label}</span>
+-        </div>
+-    );
+-}
+-
+ /* ─── Main Login Screen ─── */
+ const LoginScreen = ({ onBack }) => {
++    const handleGoogleLogin = async () => {
++        const provider = new GoogleAuthProvider();
++        try {
++            await signInWithPopup(auth, provider);
++            console.log("🔥 Firebase Google Login Successful");
++        } catch (err) {
++            console.error("Firebase Login Error:", err);
++            alert("Login failed: " + err.message);
++        }
++    };
++
+     return (
+         <div className="fixed inset-0 z-50 flex items-stretch bg-[#0d1b3e] overflow-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
+             
+@@ -197,28 +199,25 @@ const LoginScreen = ({ onBack }) => {
+                 <div className="relative z-10 flex flex-col flex-1 justify-center px-10 pb-16">
+                     <div className="mb-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full w-fit" style={{ background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)' }}>
+                         <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#FF6B6B' }}></span>
+-                        <span className="text-xs font-semibold text-[#FF6B6B] uppercase tracking-widest">Live Hazard Tracking</span>
++                        <span className="text-xs font-semibold text-[#FF6B6B] uppercase tracking-widest">Live Telemetry Node</span>
+                     </div>
+ 
+-                    <h2 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
+-                        Report Roads.<br />
++                    <h2 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tighter">
++                        IDENTIFY YOUR<br />
+                         <span style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+-                            Save Lives.
++                            MUNICIPAL RANK.
+                         </span>
+                     </h2>
+-                    <p className="text-white/50 text-base max-w-sm leading-relaxed mb-8">
+-                        Join thousands of drivers reporting real-time road hazards — potholes, accidents, waterlogging, and debris — to keep everyone safe.
++                    <p className="text-white/40 text-base max-w-sm leading-relaxed mb-10 font-medium">
++                        Securely connect to the RoadHazardX network to manage road integrity, report hazards, and monitor AI-driven detections.
+                     </p>
+ 
+                     {/* Badges */}
+                     <div className="flex flex-wrap gap-2 mb-10">
+-                        <Badge icon="map" label="Smart Navigation" />
+-                        <Badge icon="camera_alt" label="AI Detection" />
+-                        <Badge icon="people" label="Community Driven" />
+-                        <Badge icon="notifications_active" label="Real-time Alerts" />
++                        <Badge icon="map" label="Smart Maps" />
++                        <Badge icon="analytics" label="AI Insight" />
++                        <Badge icon="security" label="Encrypted" />
+                     </div>
+-
+-
+                 </div>
+ 
+                 {/* Bottom fade */}
+@@ -229,168 +228,55 @@ const LoginScreen = ({ onBack }) => {
+             <div className="flex flex-col items-center justify-center w-full md:w-[420px] lg:w-[460px] relative px-6 py-10"
+                 style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
+ 
+-                {/* Ambient glow blob */}
+-                <div className="absolute top-[-80px] right-[-80px] w-64 h-64 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,107,107,0.15) 0%, transparent 70%)' }} />
+-                <div className="absolute bottom-[-60px] left-[-60px] w-48 h-48 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,142,83,0.12) 0%, transparent 70%)' }} />
+-
+-                {/* Mobile logo (shown only on small screens) */}
+-                <div className="flex md:hidden items-center gap-3 mb-8">
+-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)' }}>
+-                        <span className="material-icons-round text-white text-xl">warning</span>
++                <div className="absolute top-[-80px] right-[-80px] w-64 h-64 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,107,107,0.1) 0%, transparent 70%)' }} />
++                
++                {/* Heading */}
++                <div className="text-center mb-10 relative z-10 w-full">
++                    <div className="inline-flex items-center justify-center w-24 h-24 rounded-[40px] mb-8 shadow-2xl relative group overflow-hidden" style={{ background: '#020617', border: '1px solid rgba(255,255,255,0.1)' }}>
++                        <span className="material-icons-round text-blue-500 text-5xl group-hover:scale-110 transition-transform">fingerprint</span>
++                        <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
+                     </div>
+-                    <span className="text-xl font-bold text-white tracking-wide">RoadHazardX</span>
++                    <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Access Node</h1>
++                    <p className="text-sm text-white/30 font-bold uppercase tracking-[0.2em] mt-2">Municipal Authentication</p>
+                 </div>
+ 
+-                {/* Heading */}
+-                <div className="text-center mb-6 relative z-10 w-full">
+-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg,#FF6B6B,#FF8E53)' }}>
+-                        <span className="material-icons-round text-white text-3xl">shield</span>
++                {/* Firebase Auth */}
++                <div className="relative z-10 w-full max-w-xs space-y-6">
++                    <button 
++                        onClick={handleGoogleLogin}
++                        className="w-full flex items-center justify-center gap-4 bg-white/5 hover:bg-white/10 px-8 py-5 rounded-[24px] border border-white/5 hover:border-white/20 transition-all group active:scale-95 shadow-2xl"
++                    >
++                        <svg className="w-6 h-6" viewBox="0 0 48 48">
++                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
++                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
++                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
++                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
++                        </svg>
++                        <span className="text-white font-black text-sm tracking-wide">Login with Google</span>
++                    </button>
++                    
++                    <div className="flex items-center gap-4 px-6 opacity-20">
++                        <div className="flex-1 h-px bg-white"></div>
++                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Encrypted</span>
++                        <div className="flex-1 h-px bg-white"></div>
+                     </div>
+-                    <h1 className="text-3xl font-bold text-white mb-1">Welcome Back</h1>
+-                    <p className="text-sm text-white/45">Sign in to access your RoadHazardX dashboard</p>
+-                </div>
+ 
+-                {/* Top accent bar */}
+-                <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-none" style={{ background: 'linear-gradient(90deg,#FF6B6B,#FF8E53,#FF6B6B)', backgroundSize: '200% 100%' }} />
+-
+-                {/* Clerk SignIn */}
+-                <div className="relative z-10 w-full max-w-sm">
+-                    <SignIn
+-                        appearance={{
+-                            variables: {
+-                                colorPrimary: '#FF6B6B',
+-                                colorBackground: 'transparent',
+-                                colorText: '#fff',
+-                                colorTextSecondary: 'rgba(255,255,255,0.5)',
+-                                colorInputBackground: 'rgba(255,255,255,0.05)',
+-                                colorInputText: '#fff',
+-                                borderRadius: '12px',
+-                                fontFamily: "'Outfit', sans-serif",
+-                            },
+-                            elements: {
+-                                rootBox: 'w-full',
+-                                card: 'bg-transparent shadow-none w-full p-0',
+-                                headerTitle: 'hidden',
+-                                headerSubtitle: 'hidden',
+-                                header: 'hidden',
+-
+-                                // Social button
+-                                socialButtonsBlockButton: [
+-                                    'w-full flex items-center justify-center gap-3',
+-                                    'rounded-xl py-3 px-4 font-semibold text-sm text-white',
+-                                    'transition-all duration-200',
+-                                ].join(' '),
+-                                socialButtonsBlockButtonText: 'font-semibold text-white',
+-
+-                                // Hide "Last used" badge
+-                                badge: 'hidden',
+-
+-                                // Divider
+-                                dividerLine: 'bg-white/10',
+-                                dividerText: 'text-white/35 text-xs uppercase tracking-widest',
+-
+-                                // Form fields
+-                                formFieldLabel: 'text-white/60 text-sm font-medium mb-1',
+-                                formFieldInput: [
+-                                    'rounded-xl py-3 px-4 text-white text-sm',
+-                                    'transition-all duration-200 outline-none',
+-                                ].join(' '),
+-                                formFieldInputShowPasswordButton: 'text-white/40 hover:text-white',
+-
+-                                // Primary button
+-                                formButtonPrimary: [
+-                                    'w-full rounded-xl py-3 font-bold text-white text-sm',
+-                                    'transition-all duration-200',
+-                                    'shadow-lg',
+-                                ].join(' '),
+-
+-                                // Footer
+-                                footerActionText: 'text-white/40 text-xs',
+-                                footerActionLink: 'text-[#FF6B6B] font-semibold hover:text-[#FF8E53] transition-colors text-xs',
+-                                footer: 'mt-2',
+-
+-                                identityPreviewText: 'text-white',
+-                                identityPreviewEditButtonIcon: 'text-[#FF6B6B]',
+-
+-                                // Alert / error
+-                                formFieldErrorText: 'text-red-400 text-xs mt-1',
+-                                alertText: 'text-red-400 text-xs',
+-                            },
+-                        }}
+-                    />
++                    <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest">
++                        <span className="material-icons-round text-xs">verified_user</span>
++                        Firebase Verified
++                    </div>
+                 </div>
+ 
+-                {/* Secured badge */}
+-                <div className="relative z-10 mt-6 flex items-center gap-2 text-white/25 text-xs">
+-                    <span className="material-icons-round text-sm">lock</span>
+-                    <span>Secured by Clerk · End-to-end encrypted</span>
++                {/* Footer Security Badge */}
++                <div className="absolute bottom-8 flex items-center gap-2 text-white/20 text-[10px] font-bold uppercase tracking-widest leading-none">
++                    <span className="material-icons-round text-sm">shield</span>
++                    256-Bit SSL Secured
+                 </div>
+             </div>
+ 
+-            {/* Global animations */}
+             <style>{`
+                 @keyframes pulse-slow { 0%,100%{opacity:0.6} 50%{opacity:1} }
+                 .animate-pulse { animation: pulse-slow 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+-
+-                @keyframes shimmer {
+-                    0%   { background-position: 200% 0; }
+-                    100% { background-position: -200% 0; }
+-                }
+-
+-                /* Clerk overrides via CSS variables */
+-                .cl-socialButtonsBlockButton {
+-                    background: rgba(255,255,255,0.06) !important;
+-                    border: 1px solid rgba(255,255,255,0.1) !important;
+-                    position: relative !important;
+-                    overflow: visible !important;
+-                }
+-
+-                /* Hide the "Last used" badge — catch every possible Clerk class name */
+-                [class*="badge"],
+-                [class*="Badge"],
+-                [class*="last-used"],
+-                [class*="lastUsed"],
+-                [data-localization-key*="lastUsed"],
+-                [data-localization-key*="last_used"] {
+-                    display: none !important;
+-                }
+-                .cl-socialButtonsBlockButton:hover {
+-                    background: rgba(255,255,255,0.12) !important;
+-                    border-color: rgba(255,107,107,0.4) !important;
+-                    transform: translateY(-1px);
+-                    box-shadow: 0 4px 20px rgba(255,107,107,0.15) !important;
+-                }
+-                .cl-formFieldInput {
+-                    background: rgba(255,255,255,0.05) !important;
+-                    border: 1px solid rgba(255,255,255,0.1) !important;
+-                    color: #fff !important;
+-                }
+-                .cl-formFieldInput:focus {
+-                    border-color: rgba(255,107,107,0.6) !important;
+-                    box-shadow: 0 0 0 3px rgba(255,107,107,0.12) !important;
+-                    background: rgba(255,255,255,0.08) !important;
+-                }
+-                .cl-formButtonPrimary {
+-                    background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%) !important;
+-                    border: none !important;
+-                    box-shadow: 0 8px 24px rgba(255,107,107,0.35) !important;
+-                }
+-                .cl-formButtonPrimary:hover {
+-                    opacity: 0.92 !important;
+-                    box-shadow: 0 12px 32px rgba(255,107,107,0.5) !important;
+-                    transform: translateY(-1px) !important;
+-                }
+-                .cl-card {
+-                    background: transparent !important;
+-                    box-shadow: none !important;
+-                    border: none !important;
+-                }
+-                .cl-internal-b3fm6y {
+-                    background: transparent !important;
+-                }
+-                .cl-footerAction {
+-                    background: transparent !important;
+-                }
+             `}</style>
+         </div>
+     );
+diff --git a/src/components/MapScreen.jsx b/src/components/MapScreen.jsx
+index 4158306f..a88f7b9b 100644
+--- a/src/components/MapScreen.jsx
++++ b/src/components/MapScreen.jsx
+@@ -519,7 +519,7 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
+ 
+     // Phase 37: Re-calculate routes if mode or preference changes while in preview phase (2)
+     useEffect(() => {
+-        if (navPhase === 2 && selectedSource && selectedDestination) {
++        if ((navPhase === 2 || navPhase === 1) && selectedSource && selectedDestination) {
+             calculateRoutes();
+         }
+     }, [travelMode, routePreference]);
+@@ -2065,15 +2065,15 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
+                                     ]).map(s => (
+                                         <button 
+                                             key={s.id} 
+-                                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${mapStyle === s.id ? 'bg-orange-50 text-orange-600' : 'hover:bg-gray-50'}`}
++                                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${mapStyle === s.id ? 'bg-orange-50 text-orange-600' : 'text-slate-700 hover:bg-gray-50'}`}
+                                             onClick={() => { setMapStyle(s.id); setShowLayerMenu(false); }}
+                                         >
+-                                            <span className={`material-icons-round text-xl ${mapStyle === s.id ? 'text-orange-600' : 'text-gray-400'}`}>
++                                            <span className={`material-icons-round text-xl ${mapStyle === s.id ? 'text-orange-600' : 'text-slate-400'}`}>
+                                                 {s.icon || (s.name.toLowerCase().includes('dark') ? 'dark_mode' : (s.name.toLowerCase().includes('satellite') ? 'satellite_alt' : 'map'))}
+                                             </span>
+                                             <div className="flex flex-col">
+                                                 <span className="text-[13px] font-bold">{s.name}</span>
+-                                                <span className="text-[9px] opacity-50 font-medium">Vector Style</span>
++                                                <span className="text-[9px] opacity-60 font-medium">Vector Style</span>
+                                             </div>
+                                         </button>
+                                     ))}
+@@ -2391,13 +2391,13 @@ const MapScreen = ({ isActive, toggleSidebar, currentUserLocation, hazards, onRo
+                                         className={`min-w-[140px] p-3 rounded-2xl border-2 transition-all cursor-pointer ${selectedRouteIndex === idx ? 'bg-white border-blue-500 shadow-lg' : 'bg-white/60 border-transparent text-gray-500'}`}
+                                     >
+                                         <div className="flex justify-between items-center mb-1">
+-                                            <span className="text-[14px] font-bold text-gray-900">{route.duration}</span>
++                                            <span className={`text-[14px] font-bold ${selectedRouteIndex === idx ? 'text-blue-600' : 'text-gray-900'}`}>{route.duration}</span>
+                                             {route.isSafest && <span className="bg-green-100 text-green-700 text-[8px] px-1.5 py-0.5 rounded-md font-black">🛡️ SAFEST</span>}
+                                             {!route.isSafest && route.isFastest && <span className="bg-blue-100 text-blue-700 text-[8px] px-1.5 py-0.5 rounded-md font-black">⚡ FASTEST</span>}
+                                         </div>
+-                                        <div className="text-[10px] opacity-70 mb-2">{route.distance}</div>
+-                                        <div className="flex items-center gap-1 text-[9px] font-bold">
+-                                            <span className="material-icons-round text-[12px] text-orange-500">warning</span>
++                                        <div className={`text-[10px] font-bold mb-2 ${selectedRouteIndex === idx ? 'text-blue-400' : 'text-gray-400'}`}>{route.distance}</div>
++                                        <div className={`flex items-center gap-1 text-[9px] font-bold ${selectedRouteIndex === idx ? 'text-orange-500' : 'text-gray-400'}`}>
++                                            <span className="material-icons-round text-[12px]">warning</span>
+                                             {Math.ceil(route.safetyScore)} Hazards
+                                         </div>
+                                     </div>
+diff --git a/src/components/Sidebar.jsx b/src/components/Sidebar.jsx
+index b182c600..0ae5eece 100644
+--- a/src/components/Sidebar.jsx
++++ b/src/components/Sidebar.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+-import { SignOutButton, useUser } from '@clerk/clerk-react';
++import { auth } from '../firebase';
++import { signOut } from 'firebase/auth';
+ 
+ const NAV_ITEMS = [
+     { id: 'hero', icon: 'auto_awesome', label: 'Overview' },
+@@ -11,7 +12,16 @@ const NAV_ITEMS = [
+ ];
+ 
+ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
+-    const { user, isLoaded } = useUser();
++    const user = auth.currentUser;
++
++    const handleSignOut = async () => {
++        try {
++            await signOut(auth);
++            console.log("🔥 Signed out from Firebase");
++        } catch (error) {
++            console.error("Sign out error:", error);
++        }
++    };
+ 
+     return (
+         <>
+@@ -57,16 +67,16 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
+                 </div>
+ 
+                 {/* User info */}
+-                {isLoaded && user && (
++                {user && (
+                     <div
+                         className="mx-4 mb-4 p-3 rounded-xl flex items-center gap-3 flex-shrink-0"
+                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                     >
+-                        {user.imageUrl ? (
++                        {user.photoURL ? (
+                             <img
+-                                src={user.imageUrl}
++                                src={user.photoURL}
+                                 alt="avatar"
+-                                className="w-10 h-10 rounded-full object-cover border-2 flex-shrink-0"
++                                className="w-10 h-10 rounded-full object-cover border-2 flex-shrink-0 shadow-xl"
+                                 style={{ borderColor: 'rgba(255,107,107,0.5)' }}
+                             />
+                         ) : (
+@@ -79,10 +89,10 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
+                         )}
+                         <div className="min-w-0">
+                             <p className="text-sm font-semibold text-white truncate">
+-                                {user.fullName || user.firstName || 'User'}
++                                {user.displayName || 'Anonymous User'}
+                             </p>
+-                            <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
+-                                {user.primaryEmailAddress?.emailAddress || ''}
++                            <p className="text-xs truncate text-white/40">
++                                {user.email || 'Cloud Node Active'}
+                             </p>
+                         </div>
+                     </div>
+@@ -92,66 +102,38 @@ const Sidebar = ({ isOpen, toggleSidebar, navigateTo }) => {
+                 <div className="mx-4 mb-3 h-px flex-shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
+ 
+                 {/* Nav items */}
+-                <nav className="flex-1 overflow-y-auto px-3 space-y-1">
++                <nav className="flex-1 overflow-y-auto px-3 space-y-1 custom-scrollbar">
+                     {NAV_ITEMS.map(({ id, icon, label }) => (
+                         <button
+                             key={id}
+                             onClick={() => {
+                                 if (id === 'admin') {
+-                                    // Secure redirection to the separate municipal command center
+-                                    const adminUrl = window.location.hostname === 'localhost' 
+-                                        ? 'http://localhost:5174' 
+-                                        : 'https://roadhazex-admin.web.app';
+-                                    window.open(adminUrl, '_blank');
++                                    window.open('https://roadhazex-admin.web.app', '_blank');
+                                 } else {
+                                     navigateTo(id);
+-                                    toggleSidebar();
+                                 }
+                             }}
+-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm transition-all duration-200"
+-                            style={{ color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}
+-                            onMouseEnter={e => {
+-                                e.currentTarget.style.background = 'rgba(255,107,107,0.12)';
+-                                e.currentTarget.style.color = '#fff';
+-                            }}
+-                            onMouseLeave={e => {
+-                                e.currentTarget.style.background = 'transparent';
+-                                e.currentTarget.style.color = 'rgba(255,255,255,0.65)';
++                            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all group"
++                            style={{
++                                background: 'transparent',
++                                color: 'rgba(255,255,255,0.6)',
+                             }}
+                         >
+-                            <span className="material-icons-round text-xl" style={{ color: '#FF6B6B' }}>{icon}</span>
+-                            {label}
++                            <span className="material-icons-round text-xl transition-colors group-hover:text-white">{icon}</span>
++                            <span className="text-sm font-medium transition-colors group-hover:text-white">{label}</span>
+                         </button>
+                     ))}
+                 </nav>
+ 
+-                {/* Divider */}
+-                <div className="mx-4 mt-3 mb-3 h-px flex-shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
+-
+-                {/* Sign Out */}
+-                <div className="px-3 pb-6 flex-shrink-0">
+-                    <SignOutButton>
+-                        <button
+-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-200"
+-                            style={{
+-                                fontWeight: 500,
+-                                color: 'rgba(255,107,107,0.85)',
+-                                background: 'rgba(255,107,107,0.08)',
+-                                border: '1px solid rgba(255,107,107,0.18)',
+-                            }}
+-                            onMouseEnter={e => {
+-                                e.currentTarget.style.background = 'rgba(255,107,107,0.2)';
+-                                e.currentTarget.style.color = '#FF6B6B';
+-                            }}
+-                            onMouseLeave={e => {
+-                                e.currentTarget.style.background = 'rgba(255,107,107,0.08)';
+-                                e.currentTarget.style.color = 'rgba(255,107,107,0.85)';
+-                            }}
+-                        >
+-                            <span className="material-icons-round text-xl">logout</span>
+-                            Sign Out
+-                        </button>
+-                    </SignOutButton>
++                {/* Sign out */}
++                <div className="p-4 flex-shrink-0 border-t border-white/5">
++                    <button 
++                        onClick={handleSignOut}
++                        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-bold text-sm transition-all border border-orange-500/20"
++                    >
++                        <span className="material-icons-round text-lg">logout</span>
++                        Sign Out
++                    </button>
+                 </div>
+             </aside>
+         </>
+diff --git a/src/main.jsx b/src/main.jsx
+index fb9638a4..b4296e8a 100644
+--- a/src/main.jsx
++++ b/src/main.jsx
+@@ -3,18 +3,8 @@ import ReactDOM from 'react-dom/client'
+ import App from './App.jsx'
+ import './index.css'
+ 
+-import { ClerkProvider } from '@clerk/clerk-react'
+-
+-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+-
+-if (!PUBLISHABLE_KEY) {
+-    throw new Error("Missing Publishable Key. Please add VITE_CLERK_PUBLISHABLE_KEY to your .env.local file.")
+-}
+-
+ ReactDOM.createRoot(document.getElementById('root')).render(
+     <React.StrictMode>
+-        <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+-            <App />
+-        </ClerkProvider>
++        <App />
+     </React.StrictMode>,
+ )
+diff --git a/storage.rules b/storage.rules
+index 660cc6aa..ac9c5045 100644
+--- a/storage.rules
++++ b/storage.rules
+@@ -2,9 +2,11 @@ rules_version = '2';
+ service firebase.storage {
+   match /b/{bucket}/o {
+     match /{allPaths=**} {
+-      // Allowing read and write as we bridge Clerk for security
+-      // Transition to: allow write: if request.auth != null; once Clerk JWT is ready
+-      allow read, write: if true;
++      // Allow read access to anyone for public safety visualization
++      allow read: if true;
++      
++      // Only authenticated users can upload hazard images or telemetry data
++      allow write: if request.auth != null;
+     }
+   }
+ }
