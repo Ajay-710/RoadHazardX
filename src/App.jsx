@@ -113,7 +113,8 @@ function App() {
                 status: hazardData.status || 'Pending',
                 verification_status: hazardData.status === 'Verified' ? 'Verified' : 'Pending',
                 resolved: false,
-                isCritical: false
+                isCritical: false,
+                jurisdiction: hazardData.jurisdiction || { Authority: 'Unknown Jurisdiction' }
             };
 
             await addDoc(collection(db, 'hazards'), docData);
@@ -171,7 +172,7 @@ function App() {
                         isActive={currentScreen === 'report'}
                         navigateTo={navigateTo}
                         currentUserLocation={currentUserLocation}
-                        onSubmit={(type, img, conf, status, addr) => {
+                        onSubmit={(type, img, conf, status, addr, jurisdiction) => {
                             submitReport({
                                 type,
                                 image: img,
@@ -179,7 +180,8 @@ function App() {
                                 lng: currentUserLocation?.lng,
                                 confidence: conf,
                                 status,
-                                address: addr
+                                address: addr,
+                                jurisdiction: jurisdiction
                             });
                         }}
                         isUploading={isUploading}

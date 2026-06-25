@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from jurisdiction import engine as jurisdiction_engine
 import torch
 import clip
 from PIL import Image
@@ -113,11 +114,19 @@ def predict():
             # Note: We use the server-side validation logic
             status, message = validate_prediction(prediction, user_selected)
 
+        # 3. Jurisdiction Detection
+        lat = request.form.get("lat")
+        lng = request.form.get("lng")
+        jurisdiction_info = None
+        if lat and lng:
+            jurisdiction_info = jurisdiction_engine.get_jurisdiction(lat, lng)
+
         return jsonify({
             "prediction": str(prediction),
             "confidence": confidence,
             "status": status,
-            "message": message
+            "message": message,
+            "jurisdiction": jurisdiction_info
         })
 
     except Exception as e:
