@@ -192,7 +192,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
     const [forceSubmitAllowed, setForceSubmitAllowed] = useState(false);
     const [cameraHovered, setCameraHovered] = useState(false);
     const [submitHovered, setSubmitHovered] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     
     // --- New: Submission Preview State ---
     const [previewData, setPreviewData] = useState(null);
