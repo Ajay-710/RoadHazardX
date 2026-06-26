@@ -118,15 +118,17 @@ def predict():
         lat = request.form.get("lat")
         lng = request.form.get("lng")
         jurisdiction_info = None
+        debug_info = None
         if lat and lng:
-            jurisdiction_info = jurisdiction_engine.get_jurisdiction(lat, lng)
+            jurisdiction_info, debug_info = jurisdiction_engine.get_jurisdiction(lat, lng)
 
         return jsonify({
             "prediction": str(prediction),
             "confidence": confidence,
             "status": status,
             "message": message,
-            "jurisdiction": jurisdiction_info
+            "jurisdiction": jurisdiction_info,
+            "debug_info": debug_info
         })
 
     except Exception as e:

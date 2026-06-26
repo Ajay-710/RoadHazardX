@@ -187,6 +187,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
     const [cameraActive, setCameraActive] = useState(false);
     const [photoPreview, setPhotoPreview] = useState(null);
     const [hazardType, setHazardType] = useState('');
+    const [expandedCategory, setExpandedCategory] = useState(null);
     const [mockMode, setMockMode] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [forceSubmitAllowed, setForceSubmitAllowed] = useState(false);
@@ -196,6 +197,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
     
     // --- New: Submission Preview State ---
     const [previewData, setPreviewData] = useState(null);
+    const [mismatchData, setMismatchData] = useState(null);
     const [editableLandmark, setEditableLandmark] = useState('');
 
     const videoRef = useRef(null);
@@ -396,8 +398,24 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                 
                 const geoRes = await fetch(`https://api.olamaps.io/places/v1/reverse-geocode?latlng=${lat},${lng}&api_key=${OLA_MAPS_API_KEY}`);
                 const geoData = await geoRes.json();
-                if (geoData.results?.[0]) {
-                    readableAddress = geoData.results[0].formatted_address;
+                
+                let foundPoi = false;
+                if (geoData.results && geoData.results.length > 0) {
+                    // Try to find a Point of Interest (POI) like a bus stop, hospital, school, etc.
+                    for (const result of geoData.results) {
+                        const types = result.types || [];
+                        const isPoi = types.some(t => ['point_of_interest', 'bus_station', 'transit_station', 'hospital', 'school', 'university', 'place_of_worship', 'establishment', 'landmark'].includes(t));
+                        if (isPoi && result.name) {
+                            readableAddress = result.name;
+                            foundPoi = true;
+                            break;
+                        }
+                    }
+                    
+                    // Fallback to formatted address if no explicit POI is found
+                    if (!foundPoi) {
+                        readableAddress = geoData.results[0].formatted_address;
+                    }
                 }
             } catch (err) {
                 console.warn("Reverse Geocoding failed:", err);
@@ -409,26 +427,39 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                 const aiStatus = data.status === true ? 'Verified' : 'Mismatch';
                 const jurisdiction = data.jurisdiction || { Authority: 'Unknown Jurisdiction' };
                 
-                // Set Priority based on hazard type (simplified logic)
+                // Set Priority based on exact hazard type
                 let priority = "Medium";
-                if (["Potholes", "Fallen trees", "Road accidents", "Damaged manholes"].includes(hazardType)) {
+                if (["Road Accident", "Waterlogging"].includes(hazardType)) {
                     priority = "High";
                 }
                 
-                setPreviewData({
+                // Format confidence (if it's e.g. 0.3975 -> 39.75)
+                let formattedConf = data.confidence;
+                if (formattedConf && formattedConf < 1) {
+                    formattedConf = (formattedConf * 100).toFixed(2);
+                } else if (formattedConf) {
+                    formattedConf = parseFloat(formattedConf).toFixed(2);
+                }
+
+                const payload = {
                     type: hazardType,
                     aiPrediction: data.prediction,
                     img: photoPreview,
-                    conf: data.confidence,
+                    conf: formattedConf,
                     status: aiStatus,
                     addr: readableAddress,
                     jurisdiction: jurisdiction,
-                    priority: priority
-                });
+                    priority: priority,
+                    debug_info: data.debug_info
+                };
+
                 setEditableLandmark(readableAddress);
-                
-                if (data.status !== true) {
-                    setValidationError(`AI predicted "${data.prediction}". Please confirm your selection before submitting.`);
+
+                // AI Validation Workflow
+                if (data.prediction.toLowerCase().trim() !== hazardType.toLowerCase().trim()) {
+                    setMismatchData(payload);
+                } else {
+                    setPreviewData(payload);
                 }
             } else if (data.error) {
                 setValidationError("AI Error: " + data.error);
@@ -775,78 +806,106 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                             <span className="material-icons-round" style={{ fontSize: '0.95rem', color: '#FF6B6B' }}>report_problem</span>
                             Hazard Type
                         </label>
-                        <div style={{ position: 'relative' }}>
-                            <select
-                                style={{
-                                    width: '100%',
-                                    padding: '0.9rem 1rem',
-                                    paddingRight: '2.5rem',
-                                    borderRadius: '0.75rem',
-                                    background: 'rgba(255,255,255,0.06)',
-                                    border: `1px solid ${hazardType ? 'rgba(255,107,107,0.45)' : 'rgba(255,255,255,0.12)'}`,
-                                    color: hazardType ? '#fff' : 'rgba(255,255,255,0.45)',
-                                    fontSize: '0.95rem',
-                                    outline: 'none',
-                                    cursor: 'pointer',
-                                    appearance: 'none',
-                                    WebkitAppearance: 'none',
-                                    transition: 'border-color 0.3s, box-shadow 0.3s',
-                                    boxShadow: hazardType ? '0 0 0 3px rgba(255,107,107,0.12)' : 'none',
-                                }}
-                                value={hazardType}
-                                onChange={(e) => {
-                                    setHazardType(e.target.value);
-                                    setValidationError('');
-                                    setForceSubmitAllowed(false);
-                                }}
-                                onFocus={e => {
-                                    e.currentTarget.style.borderColor = 'rgba(255,107,107,0.6)';
-                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,107,107,0.14)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
-                                }}
-                                onBlur={e => {
-                                    e.currentTarget.style.borderColor = hazardType ? 'rgba(255,107,107,0.45)' : 'rgba(255,255,255,0.12)';
-                                    e.currentTarget.style.boxShadow = hazardType ? '0 0 0 3px rgba(255,107,107,0.12)' : 'none';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                                }}
-                            >
-                                <option value="" disabled style={{ background: '#0a0a0a', color: '#888' }}>Select Hazard Type</option>
-                                <option value="" disabled style={{ background: '#0a0a0a', color: '#888' }}>--- ROAD HAZARDS CATEGORY ---</option>
-                                <optgroup label="1. Road Infrastructure Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Potholes" style={{ background: '#0a0a0a' }}>Potholes</option>
-                                    <option value="Road cracks" style={{ background: '#0a0a0a' }}>Road cracks</option>
-                                    <option value="Uneven roads" style={{ background: '#0a0a0a' }}>Uneven roads</option>
-                                    <option value="Damaged manholes" style={{ background: '#0a0a0a' }}>Damaged manholes</option>
-                                </optgroup>
-                                <optgroup label="2. Traffic System Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Non-functioning traffic signals" style={{ background: '#0a0a0a' }}>Non-functioning traffic signals</option>
-                                    <option value="Broken or bent traffic signs" style={{ background: '#0a0a0a' }}>Broken or bent traffic signs</option>
-                                    <option value="Non-working street lights" style={{ background: '#0a0a0a' }}>Non-working street lights</option>
-                                    <option value="Missing signboards" style={{ background: '#0a0a0a' }}>Missing signboards</option>
-                                    <option value="Improperly placed barricades" style={{ background: '#0a0a0a' }}>Improperly placed barricades</option>
-                                </optgroup>
-                                <optgroup label="3. Environmental Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Fallen trees" style={{ background: '#0a0a0a' }}>Fallen trees</option>
-                                    <option value="Debris on road" style={{ background: '#0a0a0a' }}>Debris on road</option>
-                                </optgroup>
-                                <optgroup label="4. Emergency Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Road accidents" style={{ background: '#0a0a0a' }}>Road accidents</option>
-                                    <option value="Vehicle breakdown" style={{ background: '#0a0a0a' }}>Vehicle breakdown</option>
-                                </optgroup>
-                                <optgroup label="5. Climatic Hazards" style={{ background: '#0a0a0a' }}>
-                                    <option value="Waterlogging / flooded roads" style={{ background: '#0a0a0a' }}>Waterlogging / flooded roads</option>
-                                    <option value="Low visibility zones" style={{ background: '#0a0a0a' }}>Low visibility zones (due to Fog, Mist, etc.)</option>
-                                </optgroup>
-                            </select>
-                            {/* Custom chevron */}
-                            <span className="material-icons-round" style={{
-                                position: 'absolute', right: '0.75rem', top: '50%',
-                                transform: 'translateY(-50%)',
-                                color: hazardType ? '#FF6B6B' : 'rgba(255,255,255,0.35)',
-                                fontSize: '1.2rem',
-                                pointerEvents: 'none',
-                                transition: 'color 0.3s',
-                            }}>expand_more</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                            {[
+                                {
+                                    category: "Road Infrastructure",
+                                    icon: "add_road",
+                                    items: ["Pothole", "Unrepaired/Damaged Manhole", "Broken Road Surface"]
+                                },
+                                {
+                                    category: "Traffic System",
+                                    icon: "traffic",
+                                    items: ["Traffic Signal Issue", "Traffic Sign Damage", "Streetlight Not Working", "Missing Signboard", "Improper Barricade"]
+                                },
+                                {
+                                    category: "Environmental",
+                                    icon: "nature",
+                                    items: ["Tree Obstruction", "Debris on Road"]
+                                },
+                                {
+                                    category: "Emergency",
+                                    icon: "warning",
+                                    items: ["Road Accident", "Vehicle Breakdown"]
+                                },
+                                {
+                                    category: "Climatic",
+                                    icon: "water_drop",
+                                    items: ["Waterlogging", "Low Visibility"]
+                                }
+                            ].map((cat, idx) => {
+                                const isExpanded = expandedCategory === cat.category;
+                                const isSelectedInCat = cat.items.includes(hazardType);
+                                
+                                return (
+                                    <div key={idx} style={{
+                                        background: isExpanded || isSelectedInCat ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+                                        border: `1px solid ${isSelectedInCat ? 'rgba(255,107,107,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                                        borderRadius: '0.75rem',
+                                        overflow: 'hidden',
+                                        transition: 'all 0.3s ease',
+                                    }}>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setExpandedCategory(isExpanded ? null : cat.category);
+                                            }}
+                                            style={{
+                                                width: '100%', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                                outline: 'none'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <span className="material-icons-round" style={{ color: isSelectedInCat ? '#FF6B6B' : 'rgba(255,255,255,0.5)', fontSize: '1.2rem' }}>
+                                                    {cat.icon}
+                                                </span>
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ color: isSelectedInCat ? '#fff' : 'rgba(255,255,255,0.8)', fontWeight: 600, fontSize: '0.95rem' }}>
+                                                        {cat.category}
+                                                    </span>
+                                                    {isSelectedInCat && !isExpanded && (
+                                                        <span style={{ color: '#FF6B6B', fontSize: '0.8rem', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                            <span className="material-icons-round" style={{ fontSize: '0.8rem' }}>check_circle</span>
+                                                            {hazardType}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <span className="material-icons-round" style={{ color: 'rgba(255,255,255,0.4)', transition: 'transform 0.3s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                                expand_more
+                                            </span>
+                                        </button>
+                                        
+                                        {isExpanded && (
+                                            <div style={{ padding: '0 1rem 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                                {cat.items.map((item, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            setHazardType(item);
+                                                            setExpandedCategory(null);
+                                                            setValidationError('');
+                                                            setForceSubmitAllowed(false);
+                                                        }}
+                                                        style={{
+                                                            width: '100%', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                                            background: hazardType === item ? 'rgba(255,107,107,0.15)' : 'rgba(0,0,0,0.2)',
+                                                            border: `1px solid ${hazardType === item ? 'rgba(255,107,107,0.4)' : 'transparent'}`,
+                                                            borderRadius: '0.5rem', color: hazardType === item ? '#fff' : 'rgba(255,255,255,0.6)',
+                                                            cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease', outline: 'none'
+                                                        }}
+                                                    >
+                                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hazardType === item ? '#FF6B6B' : 'rgba(255,255,255,0.2)' }} />
+                                                        {item}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -1061,6 +1120,7 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                     <div style={{
                         background: '#111', border: '1px solid rgba(255,255,255,0.1)',
                         borderRadius: '1.25rem', width: '100%', maxWidth: '28rem',
+                        maxHeight: '90vh', overflowY: 'auto',
                         padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem',
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                         animation: 'fadeInUp 0.4s ease-out forwards'
@@ -1072,9 +1132,25 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
+                            {/* Image Preview inside the modal */}
+                            {previewData.img && (
+                                <div style={{ 
+                                    width: '100%', height: '120px', borderRadius: '0.75rem', overflow: 'hidden', 
+                                    marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.1)' 
+                                }}>
+                                    <img src={previewData.img} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </div>
+                            )}
+
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
                                 <span style={{ color: 'rgba(255,255,255,0.5)' }}>Hazard Type:</span>
                                 <span style={{ color: '#fff', fontWeight: 600 }}>{previewData.type}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>GPS Coordinates:</span>
+                                <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.85rem' }}>
+                                    {currentUserLocation ? `${currentUserLocation.lat.toFixed(5)}, ${currentUserLocation.lng.toFixed(5)}` : 'Unknown'}
+                                </span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
                                 <span style={{ color: 'rgba(255,255,255,0.5)' }}>Authority:</span>
@@ -1082,15 +1158,70 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
                                 <span style={{ color: 'rgba(255,255,255,0.5)' }}>Jurisdiction Type:</span>
-                                <span style={{ color: '#fff', fontWeight: 600 }}>{previewData.jurisdiction?.Type}</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{previewData.jurisdiction?.Type || 'Unknown'}</span>
                             </div>
+
+                            {previewData.jurisdiction?.Type === 'Urban' && (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Zone:</span>
+                                        <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
+                                            {previewData.jurisdiction?.ZoneNo ? `Zone ${previewData.jurisdiction.ZoneNo}` : ''} {previewData.jurisdiction?.ZoneName || ''}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Ward:</span>
+                                        <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
+                                            {previewData.jurisdiction?.WardNo || 'Unknown'}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+
+                            {previewData.jurisdiction?.Type === 'Rural' && (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>District / Block:</span>
+                                        <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
+                                            {previewData.jurisdiction?.District || 'Unknown'} / {previewData.jurisdiction?.Block || 'Unknown'}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Panchayat / Village:</span>
+                                        <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
+                                            {previewData.jurisdiction?.Panchayat || 'Unknown'} {previewData.jurisdiction?.Village ? `(${previewData.jurisdiction.Village})` : ''}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+
+                            {(previewData.jurisdiction?.Type === 'State Highway' || previewData.jurisdiction?.Type === 'National Highway') && (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Road Number:</span>
+                                        <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>
+                                            {previewData.jurisdiction?.RoadNumber || 'Unknown'}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Road Name:</span>
+                                        <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>
+                                            {previewData.jurisdiction?.RoadName || 'Unknown'}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+
+                            {(!previewData.jurisdiction?.Type || previewData.jurisdiction?.Type === 'Unknown') && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>Details:</span>
+                                    <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>Detecting...</span>
+                                </div>
+                            )}
+
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Details (Zone/Ward):</span>
-                                <span style={{ color: '#fff', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>{previewData.jurisdiction?.Details}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Priority:</span>
-                                <span style={{ color: previewData.priority === 'High' ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>{previewData.priority}</span>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>AI Confidence:</span>
+                                <span style={{ color: '#4ade80', fontWeight: 600 }}>{previewData.conf}%</span>
                             </div>
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
@@ -1150,6 +1281,91 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                 </div>
             )}
 
+            {/* --- NEW: Mismatch Confirmation Dialog --- */}
+            {mismatchData && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 65,
+                    background: 'rgba(5,5,5,0.85)', backdropFilter: 'blur(12px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '1rem'
+                }}>
+                    <div style={{
+                        background: '#111', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '1.25rem', width: '100%', maxWidth: '28rem',
+                        padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                        animation: 'fadeInUp 0.3s ease-out forwards'
+                    }}>
+                        <div style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+                            <span className="material-icons-round" style={{ fontSize: '2.5rem', color: '#f59e0b', marginBottom: '0.5rem' }}>warning_amber</span>
+                            <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff', margin: 0 }}>AI Prediction Mismatch</h3>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.95rem' }}>
+                            <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0 }}>
+                                The predicted hazard differs from your selected hazard.
+                            </p>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.75rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>AI Predicted:</span>
+                                    <span style={{ color: '#f59e0b', fontWeight: 600 }}>{mismatchData.aiPrediction}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>You Selected:</span>
+                                    <span style={{ color: '#fff', fontWeight: 600 }}>{hazardType}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+                            <button 
+                                onClick={() => {
+                                    setHazardType(mismatchData.aiPrediction);
+                                    const updatedPayload = { ...mismatchData, type: mismatchData.aiPrediction };
+                                    setPreviewData(updatedPayload);
+                                    setMismatchData(null);
+                                }}
+                                style={{
+                                    width: '100%', padding: '0.85rem', borderRadius: '0.75rem', fontWeight: 600,
+                                    background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Use AI Prediction ({mismatchData.aiPrediction})
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setPreviewData(mismatchData);
+                                    setMismatchData(null);
+                                }}
+                                style={{
+                                    width: '100%', padding: '0.85rem', borderRadius: '0.75rem', fontWeight: 600,
+                                    background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Keep My Selection ({hazardType})
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setMismatchData(null);
+                                    setForceSubmitAllowed(false);
+                                    setPhotoPreview(null);
+                                    setCameraActive(true);
+                                }}
+                                style={{
+                                    width: '100%', padding: '0.85rem', borderRadius: '0.75rem', fontWeight: 600,
+                                    background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Retake Image
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Keyframe injections */}
             <style>{`
                 @keyframes pulse-dot {
@@ -1161,13 +1377,57 @@ const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation
                     100% { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes shimmer-sweep {
-                    0%   { transform: translateX(-100%); }
-                    100% { transform: translateX(200%); }
+                    0% { transform: translateX(-150%) skewX(-15deg); }
+                    100% { transform: translateX(150%) skewX(-15deg); }
+                }
+                @keyframes gradientShift {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+                .animate-fade-in {
+                    animation: fadeInUp 0.5s ease-out forwards;
                 }
                 @keyframes spin {
                     100% { transform: rotate(360deg); }
                 }
             `}</style>
+            
+            {/* --- NEW: Developer Debug Panel --- */}
+            {process.env.NODE_ENV === 'development' && (
+                <div style={{
+                    position: 'fixed', bottom: '1rem', left: '1rem', zIndex: 100,
+                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+                    border: '1px solid #FF6B6B', borderRadius: '0.5rem',
+                    padding: '0.75rem', fontSize: '0.7rem', color: '#0f0',
+                    fontFamily: 'monospace', maxWidth: '300px', pointerEvents: 'none'
+                }}>
+                    <div style={{ color: '#FF6B6B', fontWeight: 'bold', marginBottom: '4px', borderBottom: '1px solid #FF6B6B' }}>DEBUG PANEL</div>
+                    <div>GPS: {currentUserLocation ? `${currentUserLocation.lat.toFixed(5)}, ${currentUserLocation.lng.toFixed(5)}` : 'None'}</div>
+                    <div>Selected Hazard: {hazardType || 'None'}</div>
+                    {previewData && (
+                        <>
+                            <div>AI Confidence: {previewData.conf}%</div>
+                            <div>Prediction: {previewData.aiPrediction}</div>
+                            <div style={{ marginTop: '4px', borderTop: '1px dotted #0f0', paddingTop: '4px' }}>--- GIS DEBUG ---</div>
+                            <div>Datasets Loaded: {previewData.debug_info?.datasetsLoaded ? 'Yes' : 'No'}</div>
+                            {previewData.debug_info?.datasetsLoaded && (
+                                <>
+                                    <div>Ward Features: {previewData.debug_info?.wardCount}</div>
+                                    <div>SH Features: {previewData.debug_info?.shCount}</div>
+                                    <div>NH Features: {previewData.debug_info?.nhCount}</div>
+                                    <div>Rural Features: {previewData.debug_info?.ruralCount}</div>
+                                </>
+                            )}
+                            <div>Coordinate: [{currentUserLocation?.lng.toFixed(5)}, {currentUserLocation?.lat.toFixed(5)}]</div>
+                            <div>Matched Layer: {previewData.debug_info?.matchedLayer || 'None'}</div>
+                            <div>Road Distance: {previewData.debug_info?.roadDistance ? `${previewData.debug_info.roadDistance.toFixed(1)}m` : 'N/A'}</div>
+                            <div>Authority: {previewData.jurisdiction?.Authority}</div>
+                            <div>Reason/Notes: {previewData.debug_info?.reason || 'None'}</div>
+                        </>
+                    )}
+                </div>
+            )}
         </>
     );
 };

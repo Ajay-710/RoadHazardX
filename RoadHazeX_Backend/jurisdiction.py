@@ -7,8 +7,11 @@ from shapely.geometry.linestring import LineString
 from shapely.geometry.multilinestring import MultiLineString
 
 class JurisdictionEngine:
-    def __init__(self, data_dir="data"):
-        self.data_dir = data_dir
+    def __init__(self, data_dir=None):
+        if data_dir is None:
+            self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+        else:
+            self.data_dir = data_dir
         self.chennai_wards = []
         self.national_highways = []
         self.state_highways = []
@@ -56,46 +59,81 @@ class JurisdictionEngine:
         print(f"Loaded {len(self.rural_panchayats)} Rural Panchayats.")
 
     def get_jurisdiction(self, lat, lng):
+        debug_info = {
+            "datasetsLoaded": bool(self.chennai_wards or self.national_highways or self.state_highways or self.rural_panchayats),
+            "wardCount": len(self.chennai_wards),
+            "shCount": len(self.state_highways),
+            "nhCount": len(self.national_highways),
+            "ruralCount": len(self.rural_panchayats),
+            "matchedLayer": None,
+            "roadDistance": None,
+            "reason": None
+        }
+
         try:
             point = Point(float(lng), float(lat))
         except (ValueError, TypeError):
-            return {"Authority": "Unknown", "Details": "Invalid coordinates"}
+            debug_info["reason"] = "Invalid coordinates"
+            return {"Authority": "Unknown Jurisdiction", "Type": "Unknown"}, debug_info
+
+        is_near_road = False
+        min_road_distance = float('inf')
 
         # 1. Check National Highways (Highest priority)
         for nh in self.national_highways:
             geom = nh['geometry']
-            if geom.distance(point) <= self.highway_buffer:
+            dist = geom.distance(point)
+            if dist < min_road_distance:
+                min_road_distance = dist
+            if dist <= self.highway_buffer:
                 name = nh['properties'].get('ref', nh['properties'].get('name', 'Unknown NH'))
+                debug_info["matchedLayer"] = "National Highways"
+                debug_info["roadDistance"] = dist * 111000 # Approx degrees to meters
                 return {
-                    "Authority": "NHAI (National Highways Authority of India)",
+                    "Authority": "NHAI",
                     "Type": "National Highway",
+                    "RoadNumber": str(nh['properties'].get('ref', 'Unknown')),
+                    "RoadName": str(nh['properties'].get('name', 'Unknown')),
                     "Details": str(name)
-                }
+                }, debug_info
 
         # 2. Check State Highways
         for sh in self.state_highways:
             geom = sh['geometry']
-            if geom.distance(point) <= self.highway_buffer:
+            dist = geom.distance(point)
+            if dist < min_road_distance:
+                min_road_distance = dist
+            if dist <= self.highway_buffer:
                 name = sh['properties'].get('ref', sh['properties'].get('name', 'Unknown SH'))
+                debug_info["matchedLayer"] = "State Highways"
+                debug_info["roadDistance"] = dist * 111000
                 return {
-                    "Authority": "State Highways Department",
+                    "Authority": "Tamil Nadu State Highways",
                     "Type": "State Highway",
+                    "RoadNumber": str(sh['properties'].get('ref', 'Unknown')),
+                    "RoadName": str(sh['properties'].get('name', 'Unknown')),
                     "Details": str(name)
-                }
+                }, debug_info
+                
+        debug_info["roadDistance"] = min_road_distance * 111000 if min_road_distance != float('inf') else None
 
         # 3. Check Chennai Wards
         for ward in self.chennai_wards:
             geom = ward['geometry']
             if geom.contains(point):
                 props = ward['properties']
-                ward_no = props.get('Ward_No', props.get('ward', 'Unknown'))
-                zone_no = props.get('Zone_No', props.get('zone', 'Unknown'))
-                zone_name = props.get('Zone_Name', props.get('zone_name', 'Unknown'))
+                ward_no = props.get('Ward_No', props.get('ward', props.get('WARD_NO', 'Unknown')))
+                zone_no = props.get('Zone_No', props.get('zone', props.get('ZONE_NO', 'Unknown')))
+                zone_name = props.get('Zone_Name', props.get('zone_name', props.get('ZONE_NAME', 'Unknown')))
+                debug_info["matchedLayer"] = "Chennai Wards"
                 return {
                     "Authority": "Greater Chennai Corporation (GCC)",
-                    "Type": "Urban Local Body",
-                    "Details": f"Ward {ward_no}, Zone {zone_no} ({zone_name})"
-                }
+                    "Type": "Urban",
+                    "ZoneNo": str(zone_no),
+                    "ZoneName": str(zone_name),
+                    "WardNo": str(ward_no),
+                    "Details": f"Ward {ward_no}, Zone {zone_no}"
+                }, debug_info
 
         # 4. Check Rural Panchayats
         for panchayat in self.rural_panchayats:
@@ -104,17 +142,25 @@ class JurisdictionEngine:
                 props = panchayat['properties']
                 p_name = props.get('name', props.get('panchayat', 'Unknown Panchayat'))
                 district = props.get('district', 'Unknown District')
+                block = props.get('block', 'Unknown Block')
+                village = props.get('village', '')
+                debug_info["matchedLayer"] = "Rural Panchayats"
                 return {
                     "Authority": "Rural Development and Panchayat Raj Department",
-                    "Type": "Village Panchayat",
+                    "Type": "Rural",
+                    "District": str(district),
+                    "Block": str(block),
+                    "Panchayat": str(p_name),
+                    "Village": str(village),
                     "Details": f"{p_name}, {district}"
-                }
+                }, debug_info
 
+        debug_info["reason"] = "Location falls outside known mapped zones"
         return {
             "Authority": "Unknown Jurisdiction",
-            "Type": "Unmapped Area",
-            "Details": "Location falls outside known mapped zones"
-        }
+            "Type": "Unknown",
+            "Details": "Unmapped Area"
+        }, debug_info
 
 # Singleton instance
 engine = JurisdictionEngine()
