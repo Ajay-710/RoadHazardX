@@ -179,8 +179,8 @@ function RoadBg() {
 }
 
 // --- CONFIGURATION ---
-const LOCAL_API_URL = "http://127.0.0.1:5000/predict"; 
-const HF_SPACE_URL = "https://vijaydevaraj-vlm-clip-model.hf.space/predict"; 
+const LOCAL_API_URL = "http://127.0.0.1:7860/predict"; 
+const HF_SPACE_URL = "https://vijaydevaraj-roadhazex-python-ai-backend.hf.space/predict"; 
 // ---------------------
 
 const ReportScreen = ({ isActive, navigateTo, toggleSidebar, currentUserLocation, onSubmit }) => {
